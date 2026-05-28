@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Fondo del splash nativo (modo oscuro): carbón = surface oscura de la app. -->
+    <color name="launch_bg">#15110D</color>
+</resources>
