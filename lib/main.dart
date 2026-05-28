@@ -1,16 +1,59 @@
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 
-import 'features/auth/login_screen.dart';
-import 'theme/theme.dart';
-import 'theme/util.dart';
+import 'app.dart';
+import 'core/env/api_config.dart';
+import 'core/http/api_client.dart';
+import 'core/storage/auth_storage.dart';
+import 'core/storage/secure_auth_storage.dart';
+import 'features/auth/data/auth_repository_impl.dart';
+import 'features/auth/data/remote/auth_api.dart';
+import 'features/auth/domain/repositories/auth_repository.dart';
+import 'features/profile/data/profile_repository_impl.dart';
+import 'features/profile/data/remote/profile_api.dart';
+import 'features/profile/domain/repositories/profile_repository.dart';
+
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final http.Client httpClient = http.Client();
+  final AuthStorage authStorage = SecureAuthStorage();
+
+  final ApiClient apiClient = ApiClient(httpClient, authStorage);
+
+  final AuthApi authApi = AuthApi(apiClient);
+  final ProfileApi profileApi = ProfileApi(apiClient, httpClient);
+
+  final AuthRepository authRepository =
+      AuthRepositoryImpl(authApi, authStorage);
+  final ProfileRepository profileRepository = ProfileRepositoryImpl(profileApi);
+
+  if (kDebugMode) {
+    debugPrint('[Jala] API baseUrl = ${ApiConfig.baseUrl}');
+  }
+
+
   runApp(
-    DevicePreview(
-      enabled: _shouldEnableDevicePreview(),
-      builder: (context) => const ViajeSeguroApp(),
+    MultiProvider(
+      providers: [
+        Provider<http.Client>(
+          create: (_) => httpClient,
+          dispose: (_, c) => c.close(),
+        ),
+        Provider<AuthStorage>.value(value: authStorage),
+        Provider<ApiClient>.value(value: apiClient),
+
+        Provider<AuthRepository>.value(value: authRepository),
+        Provider<ProfileRepository>.value(value: profileRepository),
+      ],
+      child: DevicePreview(
+        enabled: _shouldEnableDevicePreview(),
+        builder: (context) => const JalaApp(),
+      ),
     ),
   );
 }
@@ -21,28 +64,4 @@ bool _shouldEnableDevicePreview() {
   return defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux ||
       defaultTargetPlatform == TargetPlatform.macOS;
-}
-
-class ViajeSeguroApp extends StatelessWidget {
-  const ViajeSeguroApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final brightness = View.of(context).platformDispatcher.platformBrightness;
-    final textTheme =
-        createTextTheme(context, 'Plus Jakarta Sans', 'Plus Jakarta Sans');
-    final theme = MaterialTheme(textTheme);
-
-    return MaterialApp(
-      title: 'ViajeSeguro',
-      debugShowCheckedModeBanner: false,
-      useInheritedMediaQuery: true,
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
-      theme: theme.light(),
-      darkTheme: theme.dark(),
-      themeMode: brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-      home: const LoginScreen(),
-    );
-  }
 }

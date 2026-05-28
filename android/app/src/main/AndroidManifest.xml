@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Necesario para tomar foto de perfil con la camara via image_picker.
+         La galeria usa el PhotoPicker del sistema (Android 13+) y no requiere permisos. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
     <application
-        android:label="viajeseguroapp"
+        android:label="Jala"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

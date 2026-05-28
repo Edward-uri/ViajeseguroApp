@@ -12,6 +12,13 @@
 .swiftpm/
 migrate_working_dir/
 
+# Configuracion con la IP/dominio real del backend — NO se sube al repo.
+# La plantilla `config/prod.example.json` SI se commitea para que el equipo
+# sepa la estructura y copie sus valores. La IP del EC2 (Learner Lab) cambia
+# seguido, asi que vive solo en local.
+config/prod.json
+config/local.json
+
 # IntelliJ related
 *.iml
 *.ipr

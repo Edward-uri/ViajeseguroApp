@@ -39,6 +39,21 @@ dependencies:
 
   device_preview: ^1.3.1
 
+  # Inyeccion de dependencias manual + gestion de estado MVVM (obligatorio cátedra).
+  provider: ^6.1.2
+
+  # Cliente HTTP (obligatorio cátedra). Una sola instancia compartida via Provider.
+  http: ^1.2.2
+
+  # Storage seguro para JWT (Android Keystore / iOS Keychain).
+  flutter_secure_storage: ^9.2.4
+
+  # Picker de imagenes (camara/galeria) — oficial del equipo Flutter.
+  image_picker: ^1.1.2
+
+  # Render de SVG (logo de marca).
+  flutter_svg: ^2.0.17
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -60,6 +75,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
