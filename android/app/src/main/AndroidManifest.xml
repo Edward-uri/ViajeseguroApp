@@ -2,7 +2,8 @@
     <!-- Necesario para tomar foto de perfil con la camara via image_picker.
          La galeria usa el PhotoPicker del sistema (Android 13+) y no requiere permisos. -->
     <uses-permission android:name="android.permission.CAMERA" />
-
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <application
         android:label="Jala"
         android:name="${applicationName}"
