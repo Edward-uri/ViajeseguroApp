@@ -2,12 +2,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/http/api_exception.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/services/mock_location_detector.dart';
 
 
 class LoginViewModel extends ChangeNotifier {
-  LoginViewModel(this._repository);
+  LoginViewModel(this._repository, this._mockLocationDetector);
 
   final AuthRepository _repository;
+  final MockLocationDetector _mockLocationDetector;
 
 
   String _identifier = '';
@@ -15,6 +17,8 @@ class LoginViewModel extends ChangeNotifier {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _checkingMockLocation = true;
+  bool _mockLocationDetected = false;
 
   String get identifier => _identifier;
   String get password => _password;
@@ -22,8 +26,24 @@ class LoginViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  bool get checkingMockLocation => _checkingMockLocation;
+
+  bool get mockLocationDetected => _mockLocationDetected;
+
   bool get canSubmit =>
       !_isLoading && _identifier.trim().isNotEmpty && _password.isNotEmpty;
+
+
+  Future<void> checkMockLocation() async {
+    _checkingMockLocation = true;
+    notifyListeners();
+
+    final detected = await _mockLocationDetector.isMockLocationActive();
+
+    _mockLocationDetected = detected;
+    _checkingMockLocation = false;
+    notifyListeners();
+  }
 
 
   void setIdentifier(String value) {

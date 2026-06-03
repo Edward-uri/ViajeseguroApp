@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/widgets/logo_badge.dart';
 import '../../../../routes/app_routes.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/services/mock_location_detector.dart';
 import '../provider/login_viewmodel.dart';
 
 
@@ -13,15 +15,155 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<LoginViewModel>(
-      create: (ctx) => LoginViewModel(ctx.read<AuthRepository>()),
+      create: (ctx) => LoginViewModel(
+        ctx.read<AuthRepository>(),
+        ctx.read<MockLocationDetector>(),
+      ),
       child: const _LoginView(),
     );
   }
 }
 
 
-class _LoginView extends StatelessWidget {
+class _LoginView extends StatefulWidget {
   const _LoginView();
+
+  @override
+  State<_LoginView> createState() => _LoginViewState();
+}
+
+class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
+  bool _closeScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<LoginViewModel>().checkMockLocation();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-verificar al volver a primer plano: el usuario pudo activar el Fake
+    // GPS mientras estaba en Ajustes.
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<LoginViewModel>().checkMockLocation();
+    }
+  }
+
+  void _scheduleAppClose() {
+    if (_closeScheduled) return;
+    _closeScheduled = true;
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        SystemNavigator.pop();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vm = context.watch<LoginViewModel>();
+
+    if (vm.checkingMockLocation) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (vm.mockLocationDetected) {
+      _scheduleAppClose();
+      return const _MockLocationBlock();
+    }
+
+    return _LoginForm(onSubmit: _onSubmit);
+  }
+
+  Future<void> _onSubmit(BuildContext context) async {
+    final vm = context.read<LoginViewModel>();
+    final ok = await vm.submit();
+    if (ok && context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.profile,
+        (route) => false,
+      );
+    }
+  }
+}
+
+
+class _MockLocationBlock extends StatelessWidget {
+  const _MockLocationBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.location_off_outlined,
+                    size: 52,
+                    color: scheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Ubicacion simulada detectada',
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Desactiva el Fake GPS o elimina la app de ubicacion '
+                    'simulada. La aplicacion se cerrara.',
+                    style: text.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => SystemNavigator.pop(),
+                    icon: const Icon(Icons.exit_to_app_outlined),
+                    label: const Text('Salir'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _LoginForm extends StatelessWidget {
+  const _LoginForm({required this.onSubmit});
+
+  final Future<void> Function(BuildContext context) onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +217,7 @@ class _LoginView extends StatelessWidget {
                     obscureText: vm.obscurePassword,
                     textInputAction: TextInputAction.done,
                     onChanged: vm.setPassword,
-                    onSubmitted: (_) => _onSubmit(context),
+                    onSubmitted: (_) => onSubmit(context),
                     decoration: InputDecoration(
                       labelText: 'Contraseña',
                       prefixIcon: const Icon(Icons.lock_outline),
@@ -95,7 +237,7 @@ class _LoginView extends StatelessWidget {
                   ],
                   const SizedBox(height: 24),
                   FilledButton(
-                    onPressed: vm.canSubmit ? () => _onSubmit(context) : null,
+                    onPressed: vm.canSubmit ? () => onSubmit(context) : null,
                     child: vm.isLoading
                         ? SizedBox(
                             height: 20,
@@ -122,17 +264,6 @@ class _LoginView extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Future<void> _onSubmit(BuildContext context) async {
-    final vm = context.read<LoginViewModel>();
-    final ok = await vm.submit();
-    if (ok && context.mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.profile,
-        (route) => false,
-      );
-    }
   }
 }
 

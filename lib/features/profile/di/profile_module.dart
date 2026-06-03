@@ -7,7 +7,6 @@ import '../data/profile_repository_impl.dart';
 import '../data/remote/profile_api.dart';
 import '../domain/repositories/profile_repository.dart';
 
-/// Cableado de dependencias del feature de perfil.
 class ProfileModule {
   const ProfileModule._();
 

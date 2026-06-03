@@ -4,11 +4,14 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 
-class MockLocationGuard {
+import '../../domain/services/mock_location_detector.dart';
+
+class MockLocationDetectorImpl implements MockLocationDetector {
   static const MethodChannel _channel =
       MethodChannel('app.viajeseguro/mock_location');
 
-  Future<bool> isMockLocationEnabled() async {
+  @override
+  Future<bool> isMockLocationActive() async {
     if (!Platform.isAndroid) return false;
 
     final fromSettings = await _isMockLocationEnabledFromSettings();

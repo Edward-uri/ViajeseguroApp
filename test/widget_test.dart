@@ -11,6 +11,7 @@ import 'package:viajeseguroapp/app.dart';
 import 'package:viajeseguroapp/core/storage/auth_storage.dart';
 import 'package:viajeseguroapp/features/auth/domain/entities/register_params.dart';
 import 'package:viajeseguroapp/features/auth/domain/repositories/auth_repository.dart';
+import 'package:viajeseguroapp/features/auth/domain/services/mock_location_detector.dart';
 import 'package:viajeseguroapp/features/profile/domain/entities/profile_photo_upload_ticket.dart';
 import 'package:viajeseguroapp/features/profile/domain/repositories/profile_repository.dart';
 import 'package:viajeseguroapp/shared/domain/entities/user.dart';
@@ -23,6 +24,11 @@ class _FakeAuthStorage implements AuthStorage {
   Future<void> writeToken(String token) async => _token = token;
   @override
   Future<void> clear() async => _token = null;
+}
+
+class _FakeMockLocationDetector implements MockLocationDetector {
+  @override
+  Future<bool> isMockLocationActive() async => false;
 }
 
 class _FakeAuthRepository implements AuthRepository {
@@ -67,6 +73,8 @@ void main() {
         providers: [
           Provider<AuthStorage>(create: (_) => _FakeAuthStorage()),
           Provider<AuthRepository>(create: (_) => _FakeAuthRepository()),
+          Provider<MockLocationDetector>(
+              create: (_) => _FakeMockLocationDetector()),
           Provider<ProfileRepository>(create: (_) => _FakeProfileRepository()),
         ],
         child: const JalaApp(),
