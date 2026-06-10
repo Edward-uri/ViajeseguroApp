@@ -57,6 +57,7 @@ dependencies:
   geolocator: ^10.1.0
   firebase_core: ^4.10.0
   firebase_messaging: ^16.3.0
+  flutter_dotenv: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -82,6 +83,7 @@ flutter:
 
   assets:
     - assets/
+    - .env
 
   # To add assets to your application, add an assets section, like this:
   # assets:

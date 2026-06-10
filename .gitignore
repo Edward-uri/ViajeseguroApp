@@ -19,6 +19,9 @@ migrate_working_dir/
 config/prod.json
 config/local.json
 
+# Environment secrets
+.env
+
 # IntelliJ related
 *.iml
 *.ipr
