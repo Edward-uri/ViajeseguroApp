@@ -1,6 +1,7 @@
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 
+import 'core/navigation/app_navigator.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
@@ -21,6 +22,7 @@ class JalaApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'Jala',
+      navigatorKey: AppNavigator.key,
       debugShowCheckedModeBanner: false,
       locale: DevicePreview.locale(context),
       builder: DevicePreview.appBuilder,

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "883656038491",
+    "project_id": "jala-e3484",
+    "storage_bucket": "jala-e3484.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:883656038491:android:b51c0b5699a90eaa58477e",
+        "android_client_info": {
+          "package_name": "com.uriel.viajeseguroapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYiGfwpsNeA7Rp6UMeom-tHKFXdxXau0w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -55,6 +55,8 @@ dependencies:
   flutter_svg: ^2.0.17
 
   geolocator: ^10.1.0
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
 
 dev_dependencies:
   flutter_test:

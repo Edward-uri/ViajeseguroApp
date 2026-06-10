@@ -5,6 +5,8 @@ import 'package:provider/single_child_widget.dart';
 import '../http/api_client.dart';
 import '../storage/auth_storage.dart';
 import '../storage/secure_auth_storage.dart';
+import '../storage/secure_sensitive_data_storage.dart';
+import '../storage/sensitive_data_storage.dart';
 
 /// Dependencias compartidas por toda la app (HTTP, almacenamiento, cliente API).
 ///
@@ -20,6 +22,9 @@ class CoreModule {
         ),
         Provider<AuthStorage>(
           create: (_) => SecureAuthStorage(),
+        ),
+        Provider<SensitiveDataStorage>(
+          create: (_) => SecureSensitiveDataStorage(),
         ),
         Provider<ApiClient>(
           create: (ctx) => ApiClient(
