@@ -5,9 +5,11 @@ import '../../../core/http/api_client.dart';
 import '../../../core/storage/auth_storage.dart';
 import '../data/auth_repository_impl.dart';
 import '../data/platform/mock_location_detector_impl.dart';
+import '../data/platform/usb_debug_detector_impl.dart';
 import '../data/remote/auth_api.dart';
 import '../domain/repositories/auth_repository.dart';
 import '../domain/services/mock_location_detector.dart';
+import '../domain/services/usb_debug_detector.dart';
 
 class AuthModule {
   const AuthModule._();
@@ -24,6 +26,9 @@ class AuthModule {
         ),
         Provider<MockLocationDetector>(
           create: (_) => MockLocationDetectorImpl(),
+        ),
+        Provider<UsbDebugDetector>(
+          create: (_) => UsbDebugDetectorImpl(),
         ),
       ];
 }

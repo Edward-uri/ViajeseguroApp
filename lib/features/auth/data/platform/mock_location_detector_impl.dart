@@ -14,21 +14,24 @@ class MockLocationDetectorImpl implements MockLocationDetector {
   Future<bool> isMockLocationActive() async {
     if (!Platform.isAndroid) return false;
 
-    final fromSettings = await _isMockLocationEnabledFromSettings();
-    if (fromSettings) return true;
-
-    final permissionGranted = await _ensureLocationPermission();
-    if (!permissionGranted) return false;
-
     try {
+      // 1. Verificar vía Settings (MethodChannel) - Es lo más rápido
+      final fromSettings = await _isMockLocationEnabledFromSettings()
+          .timeout(const Duration(seconds: 2), onTimeout: () => false);
+      if (fromSettings) return true;
+
+      // 2. Verificar vía Geolocator (Posición real)
+      final permissionGranted = await _ensureLocationPermission()
+          .timeout(const Duration(seconds: 3), onTimeout: () => false);
+      if (!permissionGranted) return false;
+
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 6),
+        desiredAccuracy: LocationAccuracy.low, // Cambiado a low para mayor rapidez en emuladores
+        timeLimit: const Duration(seconds: 4),
       );
       return position.isMocked;
-    } on TimeoutException {
-      return false;
-    } on Exception {
+    } catch (e) {
+      // Si algo falla o hay timeout, asumimos que no hay mock para no bloquear al usuario
       return false;
     }
   }
@@ -44,15 +47,19 @@ class MockLocationDetectorImpl implements MockLocationDetector {
   }
 
   Future<bool> _ensureLocationPermission() async {
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return false;
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return false;
 
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      return permission == LocationPermission.always ||
+          permission == LocationPermission.whileInUse;
+    } catch (_) {
+      return false;
     }
-
-    return permission == LocationPermission.always ||
-        permission == LocationPermission.whileInUse;
   }
 }

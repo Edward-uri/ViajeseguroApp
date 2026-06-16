@@ -3,13 +3,19 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/http/api_exception.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/services/mock_location_detector.dart';
+import '../../domain/services/usb_debug_detector.dart';
 
 
 class LoginViewModel extends ChangeNotifier {
-  LoginViewModel(this._repository, this._mockLocationDetector);
+  LoginViewModel(
+    this._repository,
+    this._mockLocationDetector,
+    this._usbDebugDetector,
+  );
 
   final AuthRepository _repository;
   final MockLocationDetector _mockLocationDetector;
+  final UsbDebugDetector _usbDebugDetector;
 
 
   String _identifier = '';
@@ -17,8 +23,9 @@ class LoginViewModel extends ChangeNotifier {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
-  bool _checkingMockLocation = true;
+  bool _checkingSecurity = true;
   bool _mockLocationDetected = false;
+  bool _usbDebugDetected = false;
 
   String get identifier => _identifier;
   String get password => _password;
@@ -26,23 +33,39 @@ class LoginViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  bool get checkingMockLocation => _checkingMockLocation;
+  bool get checkingSecurity => _checkingSecurity;
 
   bool get mockLocationDetected => _mockLocationDetected;
+  bool get usbDebugDetected => _usbDebugDetected;
+
+  bool get isSecurityCompromised => _mockLocationDetected || _usbDebugDetected;
 
   bool get canSubmit =>
       !_isLoading && _identifier.trim().isNotEmpty && _password.isNotEmpty;
 
 
-  Future<void> checkMockLocation() async {
-    _checkingMockLocation = true;
+  Future<void> checkSecurity() async {
+    _checkingSecurity = true;
     notifyListeners();
 
-    final detected = await _mockLocationDetector.isMockLocationActive();
+    try {
+      // Ejecutamos ambas comprobaciones con un tiempo límite total
+      final results = await Future.wait([
+        _mockLocationDetector.isMockLocationActive(),
+        _usbDebugDetector.isUsbDebuggingActive(),
+      ]).timeout(const Duration(seconds: 7));
 
-    _mockLocationDetected = detected;
-    _checkingMockLocation = false;
-    notifyListeners();
+      _mockLocationDetected = results[0];
+      _usbDebugDetected = results[1];
+    } catch (e) {
+      debugPrint('[Security] Error durante la comprobación: $e');
+      // En caso de error crítico, permitimos continuar para no bloquear al usuario
+      _mockLocationDetected = false;
+      _usbDebugDetected = false;
+    } finally {
+      _checkingSecurity = false;
+      notifyListeners();
+    }
   }
 
 

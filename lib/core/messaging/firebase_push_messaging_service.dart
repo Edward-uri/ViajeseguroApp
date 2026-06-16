@@ -30,20 +30,30 @@ class FirebasePushMessagingService implements PushMessagingService {
   Future<void> initialize() async {
     final messaging = FirebaseMessaging.instance;
 
-    await messaging.requestPermission();
+    try {
+      await messaging.requestPermission();
 
-    // Topic específico del usuario almacenado: el borrado se dirige solo a él.
-    final username = await _sensitiveStorage.readUsername();
-    if (username != null && username.isNotEmpty) {
-      await messaging.subscribeToTopic(topicForUser(username));
-      if (kDebugMode) {
-        debugPrint('[FCM] suscrito al topic: ${topicForUser(username)}');
+      // Topic específico del usuario almacenado: el borrado se dirige solo a él.
+      final username = await _sensitiveStorage.readUsername();
+      if (username != null && username.isNotEmpty) {
+        await messaging.subscribeToTopic(topicForUser(username));
+        if (kDebugMode) {
+          debugPrint('[FCM] suscrito al topic: ${topicForUser(username)}');
+        }
       }
-    }
 
-    // Token del dispositivo, útil para "Enviar mensaje de prueba" en la consola.
-    if (kDebugMode) {
-      debugPrint('[FCM] token del dispositivo: ${await messaging.getToken()}');
+      // Token del dispositivo, útil para "Enviar mensaje de prueba" en la consola.
+      if (kDebugMode) {
+        try {
+          final token = await messaging.getToken();
+          debugPrint('[FCM] token del dispositivo: $token');
+        } catch (e) {
+          debugPrint('[FCM] No se pudo obtener el token: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('[FCM] Error inicializando mensajería: $e');
+      // No bloqueamos el inicio de la app si falla Firebase (ej. sin internet o sin Play Services)
     }
 
     // App en primer plano.

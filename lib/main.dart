@@ -24,13 +24,32 @@ import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  
+  debugPrint('[App] Iniciando secuencia de arranque...');
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    await dotenv.load(fileName: ".env");
+    debugPrint('[App] .env cargado');
+  } catch (e) {
+    debugPrint('[App] Advertencia: .env no cargado: $e');
+  }
 
-  await _initSecureDataAndRemoteWipe();
+  try {
+
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 5));
+    debugPrint('[App] Firebase inicializado');
+  } catch (e) {
+    debugPrint('[App] Error o Timeout en Firebase: $e');
+  }
+
+  try {
+    await _initSecureDataAndRemoteWipe();
+    debugPrint('[App] Servicios de seguridad inicializados');
+  } catch (e) {
+    debugPrint('[App] Error en servicios de seguridad: $e');
+  }
 
   if (kDebugMode) {
     debugPrint('[Jala] API baseUrl = ${ApiConfig.baseUrl}');
@@ -52,10 +71,6 @@ Future<void> main() async {
 }
 
 /// Siembra los datos sensibles e inicializa el borrado remoto por FCM.
-///
-/// La siembra corre en todas las plataformas. La mensajería FCM solo se activa
-/// donde está soportada (Android/iOS/macOS/web); en Windows/Linux se omite para
-/// no afectar la ejecución de la app.
 Future<void> _initSecureDataAndRemoteWipe() async {
   final sensitiveStorage = SecureSensitiveDataStorage();
   await SensitiveDataSeeder(sensitiveStorage).seedIfEmpty();
@@ -64,7 +79,11 @@ Future<void> _initSecureDataAndRemoteWipe() async {
   if (!_isMessagingSupported()) return;
 
   // El handler de background debe registrarse antes de runApp.
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  try {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('[App] No se pudo registrar el background handler: $e');
+  }
 
   final wipeHandler = RemoteWipeHandler(sensitiveStorage, SecureAuthStorage());
   final messaging = FirebasePushMessagingService(
@@ -72,7 +91,12 @@ Future<void> _initSecureDataAndRemoteWipe() async {
     sensitiveStorage: sensitiveStorage,
     onWipeCompleted: AppNavigator.goToLogin,
   );
-  await messaging.initialize();
+  
+  // No esperamos (await) a que termine la inicialización de mensajería para no bloquear el UI
+  // si el servicio de tokens de Google está caído.
+  messaging.initialize().catchError((e) {
+    debugPrint('[App] Error asíncrono en messaging.initialize: $e');
+  });
 }
 
 bool _isMessagingSupported() {

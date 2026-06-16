@@ -6,6 +6,7 @@ import '../../../../core/widgets/logo_badge.dart';
 import '../../../../routes/app_routes.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/services/mock_location_detector.dart';
+import '../../domain/services/usb_debug_detector.dart';
 import '../provider/login_viewmodel.dart';
 
 
@@ -18,6 +19,7 @@ class LoginScreen extends StatelessWidget {
       create: (ctx) => LoginViewModel(
         ctx.read<AuthRepository>(),
         ctx.read<MockLocationDetector>(),
+        ctx.read<UsbDebugDetector>(),
       ),
       child: const _LoginView(),
     );
@@ -41,7 +43,7 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<LoginViewModel>().checkMockLocation();
+        context.read<LoginViewModel>().checkSecurity();
       }
     });
   }
@@ -54,17 +56,16 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Re-verificar al volver a primer plano: el usuario pudo activar el Fake
-    // GPS mientras estaba en Ajustes.
     if (state == AppLifecycleState.resumed && mounted) {
-      context.read<LoginViewModel>().checkMockLocation();
+      context.read<LoginViewModel>().checkSecurity();
     }
   }
 
   void _scheduleAppClose() {
     if (_closeScheduled) return;
     _closeScheduled = true;
-    Future.delayed(const Duration(seconds: 2), () {
+    // Se cierra en 5 segundos según requerimiento
+    Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         SystemNavigator.pop();
       }
@@ -75,10 +76,16 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final vm = context.watch<LoginViewModel>();
 
-    if (vm.checkingMockLocation) {
+    if (vm.checkingSecurity) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+
+    // Bloqueo por depuración USB activo (ADB)
+    if (vm.usbDebugDetected) {
+      _scheduleAppClose();
+      return const _UsbDebugBlock();
     }
 
     if (vm.mockLocationDetected) {
@@ -101,6 +108,63 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
   }
 }
 
+class _UsbDebugBlock extends StatelessWidget {
+  const _UsbDebugBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.adb_outlined,
+                    size: 52,
+                    color: scheme.error,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Seguridad Comprometida',
+                    style: text.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Se ha detectado la depuración USB activa. Por políticas de seguridad, '
+                    'debes desactivar esta opción en los ajustes de desarrollador. '
+                    'La aplicación se cerrará en 5 segundos.',
+                    style: text.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => SystemNavigator.pop(),
+                    icon: const Icon(Icons.exit_to_app_outlined),
+                    label: const Text('Salir'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _MockLocationBlock extends StatelessWidget {
   const _MockLocationBlock();
@@ -127,7 +191,7 @@ class _MockLocationBlock extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Ubicacion simulada detectada',
+                    'Ubicación simulada detectada',
                     style: text.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: scheme.onSurface,
@@ -136,8 +200,8 @@ class _MockLocationBlock extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Desactiva el Fake GPS o elimina la app de ubicacion '
-                    'simulada. La aplicacion se cerrara.',
+                    'Desactiva el Fake GPS o elimina la app de ubicación '
+                    'simulada. La aplicación se cerrará en 5 segundos.',
                     style: text.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
