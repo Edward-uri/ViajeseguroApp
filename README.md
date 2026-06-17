@@ -16,6 +16,9 @@ Cliente Flutter de **Jala**, una plataforma de moto-taxis. Esta app es la del **
 | **google_fonts** | Cargar **Plus Jakarta Sans** sin tener que pegar los `.ttf` en el repo |
 | **flutter_svg** | Renderizar el logo de la marca como vector |
 | **image_picker** | Elegir foto de perfil desde galería o cámara |
+| **firebase_core** | Inicialización de Firebase |
+| **firebase_messaging** | Push notifications vía FCM (remote wipe) |
+| **geolocator** | Detectar ubicaciones mock en Android |
 | **device_preview** | Probar la UI en distintos devices sin emulador (solo activo en web/desktop debug) |
 
 ---
@@ -96,17 +99,34 @@ La View se suscribe al ViewModel con `context.watch<XxxViewModel>()` y se recons
 
 ```
 lib/
-├── main.dart                              ← entry point + bootstrap de toda la DI
+├── main.dart                              ← entry point + bootstrap de toda la DI + Firebase init
 ├── app.dart                               ← MaterialApp + theme + rutas
+├── firebase_options.dart                  ← config de Firebase por plataforma (desde .env)
 │
 ├── core/                                  ← cosas transversales a TODA la app
+│   ├── di/
+│   │   └── core_module.dart               ← providers app-wide (http, storage, api)
 │   ├── env/api_config.dart                ← lee API_BASE_URL del compile-time env
 │   ├── http/
 │   │   ├── api_client.dart                ← wrapper de http.Client, inyecta JWT
-│   │   └── api_exception.dart             ← excepciones tipadas (Unauthorized, Validation, etc.)
-│   └── storage/
-│       ├── auth_storage.dart              ← interfaz abstracta
-│       └── secure_auth_storage.dart       ← implementación con flutter_secure_storage
+│   │   └── api_exception.dart             ← excepciones tipadas (Network, Unauthorized, Validation…)
+│   ├── messaging/
+│   │   ├── push_messaging_service.dart            ← interfaz abstracta FCM
+│   │   ├── firebase_push_messaging_service.dart   ← impl con firebase_messaging
+│   │   └── background_message_handler.dart        ← handler en isolate background
+│   ├── navigation/
+│   │   └── app_navigator.dart             ← GlobalKey<NavigatorState> para navegar sin context
+│   ├── security/
+│   │   └── remote_wipe_handler.dart       ← borrado remoto de datos sensibles vía FCM
+│   ├── storage/
+│   │   ├── auth_storage.dart              ← interfaz abstracta
+│   │   ├── secure_auth_storage.dart       ← impl con flutter_secure_storage
+│   │   ├── sensitive_data_storage.dart           ← interfaz abstracta (datos sensibles)
+│   │   ├── secure_sensitive_data_storage.dart    ← impl con flutter_secure_storage
+│   │   ├── sensitive_data_seeder.dart            ← siembra datos demo al primer inicio
+│   │   └── sensitive_data_debug.dart             ← helper debug del storage
+│   └── widgets/
+│       └── logo_badge.dart                ← widget reutilizable del logo
 │
 ├── shared/                                ← lo que comparten varias features
 │   ├── domain/entities/user.dart          ← entidad User (puro, sin JSON)
@@ -118,21 +138,40 @@ lib/
 │
 ├── routes/app_routes.dart                 ← constantes de nombres de ruta
 │
-└── features/
+├── assets/
+│   └── logo.svg                           ← logo vectorial de la marca
+│
+├── config/
+│   ├── dev.json                           ← config de desarrollo (localhost:3000)
+│   ├── prod.example.json                  ← plantilla de producción (git-tracked)
+│   └── prod.json                          ← config real de producción (git-ignored)
+│
+├── docs/
+│   └── superpowers/specs/                 ← documentos de diseño adicionales
+│
+└── features/                              ← vertical slicing
     ├── splash/
-    │   └── presentation/splash_screen.dart
+    │   └── presentation/splash_screen.dart ← splash animado + decisión de ruta
     │
     ├── auth/                              ← LOGIN + REGISTER
     │   ├── data/
-    │   │   ├── remote/auth_api.dart       ← HTTP datasource (rutas como constantes)
+    │   │   ├── remote/auth_api.dart       ← HTTP datasource
     │   │   ├── mappers/register_params_mapper.dart
+    │   │   ├── platform/
+    │   │   │   ├── mock_location_detector_impl.dart  ← MethodChannel Android
+    │   │   │   └── usb_debug_detector_impl.dart      ← MethodChannel Android
     │   │   └── auth_repository_impl.dart  ← orquesta remote + mappers + storage
     │   ├── domain/
-    │   │   ├── entities/register_params.dart    ← value object puro (sin toJson)
-    │   │   └── repositories/auth_repository.dart  ← contrato abstracto
+    │   │   ├── entities/register_params.dart    ← value object puro
+    │   │   ├── repositories/auth_repository.dart  ← contrato abstracto
+    │   │   └── services/
+    │   │       ├── mock_location_detector.dart    ← interfaz abstracta
+    │   │       └── usb_debug_detector.dart        ← interfaz abstracta
+    │   ├── di/
+    │   │   └── auth_module.dart           ← providers del feature auth
     │   └── presentation/
-    │       ├── provider/                  ← los ChangeNotifier (LoginViewModel, RegisterViewModel)
-    │       └── screens/                   ← los Widgets
+    │       ├── provider/                  ← ChangeNotifier (LoginViewModel, RegisterViewModel)
+    │       └── screens/                   ← Widgets de pantalla
     │
     └── profile/                           ← CRUD del usuario autenticado
         ├── data/
@@ -142,6 +181,8 @@ lib/
         ├── domain/
         │   ├── entities/profile_photo_upload_ticket.dart
         │   └── repositories/profile_repository.dart
+        ├── di/
+        │   └── profile_module.dart        ← providers del feature profile
         └── presentation/
             ├── provider/
             └── screens/
@@ -273,6 +314,24 @@ El ViewModel hace `try/catch` y traduce a `errorMessage` para la UI. Pensé en u
 
 ---
 
+## Patrones de diseño
+
+Más allá de Clean Architecture y MVVM, la app aplica estos patrones de forma consistente:
+
+| Patrón | Dónde aparece | Para qué sirve |
+|--------|---------------|----------------|
+| **Repository** | `AuthRepository` / `AuthRepositoryImpl`, `ProfileRepository` / `ProfileRepositoryImpl` | Interfaz en domain, implementación en data. El dominio nunca sabe cómo se obtienen los datos. |
+| **Factory** | `CoreModule.providers()`, `AuthModule.providers()`, `ProfileModule.providers()` | Métodos estáticos que construyen y configuran la cadena de dependencias. |
+| **Singleton** | `http.Client`, `ApiClient`, `AuthStorage`, `SensitiveDataStorage`, repositorios | Una sola instancia compartida en toda la app, inyectada vía `MultiProvider`. |
+| **Strategy** | `AuthStorage` / `SecureAuthStorage`, `SensitiveDataStorage` / `SecureSensitiveDataStorage` | La interfaz define el contrato; se puede intercambiar la implementación (real, mock, otra tecnología). |
+| **Adapter** | `UserMapper`, `RegisterParamsMapper`, `ProfilePhotoUploadTicketMapper` | Convierte entre entidades de dominio (puras) y el formato del backend (JSON), manteniendo el dominio aislado. |
+| **Bridge** | `MockLocationDetector` / `MockLocationDetectorImpl`, `UsbDebugDetector` / `UsbDebugDetectorImpl` | Interfaz abstracta en domain, implementación nativa Android via `MethodChannel`. El domain no depende de Flutter ni de Android. |
+| **Value Object** | `RegisterParams`, `ProfilePhotoUploadTicket` | Objetos inmutables que encapsulan datos sin identidad propia. |
+| **Global Key / Mediator** | `AppNavigator` | Singleton con `GlobalKey<NavigatorState>` que permite navegar desde código que no tiene `BuildContext` (por ejemplo, el handler de notificaciones FCM en segundo plano). |
+| **Data Seeder** | `SensitiveDataSeeder` | Siembra datos de demostración en el primer inicio, siguiendo el patrón Strategy para no acoplar la siembra al storage concreto. |
+
+---
+
 ## Flujo de autenticación
 
 ```
@@ -305,6 +364,47 @@ El ViewModel hace `try/catch` y traduce a `errorMessage` para la UI. Pensé en u
 ```
 
 El `ApiClient` agrega el header `Authorization: Bearer <jwt>` **automáticamente** leyéndolo del `AuthStorage` en cada request. Ningún viewmodel ni screen tiene que preocuparse del token — eso vive en la infraestructura.
+
+---
+
+## Seguridad
+
+### Detección de riesgos en el login
+
+Antes de dejar al usuario autenticarse, `LoginViewModel` ejecuta una verificación de seguridad del dispositivo Android via `MethodChannel`:
+
+```
+LoginScreen → LoginViewModel.checkSecurity()
+  ├── MockLocationDetector (MethodChannel + Geolocator)
+  │     └─ ¿GPS mockeado? → bloquea login
+  └── UsbDebugDetector (MethodChannel)
+        └─ ¿USB debugging activo? → bloquea login
+```
+
+Si se detecta cualquiera de los dos riesgos, la pantalla muestra un bloqueo con **cuenta regresiva de 5 segundos** y cierra la sesión automáticamente. La app no permite login en dispositivos comprometidos.
+
+Las interfaces (`MockLocationDetector`, `UsbDebugDetector`) viven en `features/auth/domain/services/` (Dart puro). Las implementaciones concretas viven en `features/auth/data/platform/` y usan `MethodChannel` para hablar con el código Kotlin nativo de Android.
+
+### FLAG_SECURE nativo (sin paquete)
+
+Como se detalla en la decisión técnica #8, la `MainActivity.kt` de Android activa `FLAG_SECURE` al arrancar, antes de que cualquier código Dart se ejecute. Bloquea capturas de pantalla, grabación y previsualización en el switcher de apps.
+
+### Remote wipe vía FCM
+
+La app incluye un mecanismo de **borrado remoto** mediante Firebase Cloud Messaging.
+
+Cuando el servidor envía una notificación push con data payload indicando un wipe, el `RemoteWipeHandler` se ejecuta (incluso si la app está en segundo plano) y:
+
+1. Borra todos los datos sensibles almacenados (username, email, teléfono, session token, user ID).
+2. Borra el JWT de autenticación.
+3. Resetea el flag de "datos ya sembrados".
+4. Navega al login limpiando el stack.
+
+Esto se orquesta desde:
+- `core/security/remote_wipe_handler.dart` — lógica de borrado.
+- `core/messaging/firebase_push_messaging_service.dart` — suscripción FCM + recepción de mensajes.
+- `core/messaging/background_message_handler.dart` — callback en isolate background para mensajes FCM cuando la app está cerrada.
+- `core/storage/sensitive_data_storage.dart` + `secure_sensitive_data_storage.dart` — almacenamiento encriptado de los 5 campos sensibles.
 
 ---
 
@@ -345,8 +445,17 @@ flutter build apk --release --dart-define-from-file=config/prod.json
 
 ```bash
 flutter analyze   # static analysis, debe decir "No issues found!"
-flutter test      # smoke test del arranque
+flutter test      # corre tests unitarios y widget tests
 ```
+
+La suite de tests se organiza así:
+
+| Archivo | Tipo | Qué prueba |
+|---------|------|------------|
+| `test/widget_test.dart` | Widget smoke test | Verifica que la app monta y muestra el branding "Jala" en el SplashScreen. Usa fakes de `AuthStorage`, `AuthRepository`, `MockLocationDetector` y `ProfileRepository`. |
+| `test/features/auth/login_viewmodel_test.dart` | Unit test | 4 casos: mock location detectado, USB debug detectado, sin riesgos, y estado inicial. Usa stubs con contadores de llamadas. |
+
+Los ViewModels son `ChangeNotifier`s puros sin dependencia de Flutter, lo que los hace directamente testeables inyectando fakes de sus repositorios.
 
 ---
 
@@ -355,7 +464,9 @@ flutter test      # smoke test del arranque
 - **`data/local/`**: cuando agreguemos cache (perfil offline, lista de viajes recientes) va aquí.
 - **HTTPS en producción**: hoy el backend responde por `http://` plano. En `release` Android bloquea cleartext — hay que configurar `network_security_config.xml` o ponerle HTTPS al servidor.
 - **Refresh token**: el backend emite un JWT con expiración de 7 días sin refresh. Cuando se venza, el `UnauthorizedException` que ya manejamos manda al usuario a Login. Si se quiere algo más fino (refresh transparente), va aquí.
-- **Tests unitarios** de viewmodels: el smoke test actual solo verifica que la app monta. Los ViewModels son `ChangeNotifier`s puros — son fáciles de testear con fakes del repositorio.
+- **Tests de RegisterViewModel y ProfileViewModel**: hoy solo hay tests de `LoginViewModel`. Los otros dos ViewModels siguen el mismo patrón y son igualmente testeables.
+- **Integración y E2E**: no hay tests de integración (widget tests con dependencias reales) ni end-to-end.
+- **Suscripción a topics FCM**: el remote wipe está implementado del lado del cliente, pero falta que el servidor envíe la notificación push al topic correcto.
 
 ---
 
