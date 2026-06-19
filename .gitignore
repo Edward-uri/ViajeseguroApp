@@ -21,6 +21,7 @@ config/local.json
 
 # Environment secrets
 .env
+opencode.json
 
 # IntelliJ related
 *.iml

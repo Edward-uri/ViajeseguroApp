@@ -91,9 +91,7 @@ Future<void> _initSecureDataAndRemoteWipe() async {
     sensitiveStorage: sensitiveStorage,
     onWipeCompleted: AppNavigator.goToLogin,
   );
-  
-  // No esperamos (await) a que termine la inicialización de mensajería para no bloquear el UI
-  // si el servicio de tokens de Google está caído.
+
   messaging.initialize().catchError((e) {
     debugPrint('[App] Error asíncrono en messaging.initialize: $e');
   });

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'core/navigation/app_navigator.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
+import 'features/passenger/home/presentation/screens/passenger_home_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'routes/app_routes.dart';
@@ -30,12 +31,13 @@ class JalaApp extends StatelessWidget {
       darkTheme: theme.dark(),
       themeMode:
           brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-      initialRoute: AppRoutes.splash,
+      initialRoute: AppRoutes.login,
       routes: <String, WidgetBuilder>{
         AppRoutes.splash: (_) => const SplashScreen(),
         AppRoutes.login: (_) => const LoginScreen(),
         AppRoutes.register: (_) => const RegisterScreen(),
         AppRoutes.profile: (_) => const ProfileScreen(),
+        AppRoutes.passengerHome: (_) => const PassengerHomeScreen(),
       },
     );
   }
