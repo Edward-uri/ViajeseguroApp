@@ -1,29 +1,44 @@
-// Smoke test: la app arranca, monta el splash con el branding "Jala".
-//
-// No corre el flujo completo (el splash hace lecturas async al secure
-// storage; testearlo end-to-end requiere mockear AuthStorage). Aca solo
-// verificamos que el arbol de widgets se construye sin excepciones.
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 import 'package:viajeseguroapp/app.dart';
+import 'package:viajeseguroapp/core/di/core_module.dart';
 import 'package:viajeseguroapp/core/storage/auth_storage.dart';
+import 'package:viajeseguroapp/features/auth/di/auth_module.dart';
+import 'package:viajeseguroapp/features/auth/domain/entities/municipio.dart';
 import 'package:viajeseguroapp/features/auth/domain/entities/register_params.dart';
 import 'package:viajeseguroapp/features/auth/domain/repositories/auth_repository.dart';
+import 'package:viajeseguroapp/features/auth/domain/repositories/municipios_repository.dart';
 import 'package:viajeseguroapp/features/auth/domain/services/mock_location_detector.dart';
+import 'package:viajeseguroapp/features/auth/domain/services/usb_debug_detector.dart';
+import 'package:viajeseguroapp/features/profile/di/profile_module.dart';
 import 'package:viajeseguroapp/features/profile/domain/entities/profile_photo_upload_ticket.dart';
 import 'package:viajeseguroapp/features/profile/domain/repositories/profile_repository.dart';
 import 'package:viajeseguroapp/shared/domain/entities/user.dart';
 
 class _FakeAuthStorage implements AuthStorage {
   String? _token;
+  String? _refreshToken;
+  String? _user;
   @override
   Future<String?> readToken() async => _token;
   @override
   Future<void> writeToken(String token) async => _token = token;
   @override
-  Future<void> clear() async => _token = null;
+  Future<String?> readRefreshToken() async => _refreshToken;
+  @override
+  Future<void> writeRefreshToken(String token) async => _refreshToken = token;
+  @override
+  Future<String?> readUser() async => _user;
+  @override
+  Future<void> writeUser(String userJson) async => _user = userJson;
+  @override
+  Future<void> clear() async {
+    _token = null;
+    _refreshToken = null;
+    _user = null;
+  }
 }
 
 class _FakeMockLocationDetector implements MockLocationDetector {
@@ -31,16 +46,37 @@ class _FakeMockLocationDetector implements MockLocationDetector {
   Future<bool> isMockLocationActive() async => false;
 }
 
+class _FakeUsbDebugDetector implements UsbDebugDetector {
+  @override
+  Future<bool> isUsbDebuggingActive() async => false;
+}
+
 class _FakeAuthRepository implements AuthRepository {
   @override
   Future<bool> hasSession() async => false;
   @override
-  Future<User> login({required String identifier, required String password}) =>
+  Future<User> loginWithPassword({required String correo, required String contrasena, String? dispositivo}) =>
       throw UnimplementedError();
   @override
-  Future<User> register(RegisterParams params) => throw UnimplementedError();
+  Future<void> registerStart({required String correo, String rol = 'pasajero'}) async {}
   @override
-  Future<void> logout() async {}
+  Future<String> registerVerify({required String correo, required String codigo, String rol = 'pasajero'}) =>
+      throw UnimplementedError();
+  @override
+  Future<User> registerComplete(RegisterParams params) => throw UnimplementedError();
+  @override
+  Future<void> logout({String? refreshToken}) async {}
+  @override
+  Future<User?> getCurrentUser() async => null;
+  @override
+  Future<void> registrarDispositivo({required String plataforma, required String version, String? modelo, String? tokenPush}) async {}
+}
+
+class _FakeMunicipiosRepository implements MunicipiosRepository {
+  @override
+  Future<List<Municipio>> getMunicipios() async => const [
+    Municipio(idMunicipio: 1, nombre: 'Suchiapa', estado: 'Chiapas'),
+  ];
 }
 
 class _FakeProfileRepository implements ProfileRepository {
@@ -65,31 +101,35 @@ class _FakeProfileRepository implements ProfileRepository {
   Future<void> deleteAccount() async {}
 }
 
+class _FakeHttpClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    return http.StreamedResponse(Stream.empty(), 200);
+  }
+}
+
 void main() {
-  testWidgets('La app monta el SplashScreen con el branding "Jala"',
+  testWidgets('La app monta el LoginScreen con el branding "Jala"',
       (WidgetTester tester) async {
     await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          Provider<AuthStorage>(create: (_) => _FakeAuthStorage()),
-          Provider<AuthRepository>(create: (_) => _FakeAuthRepository()),
-          Provider<MockLocationDetector>(
-              create: (_) => _FakeMockLocationDetector()),
-          Provider<ProfileRepository>(create: (_) => _FakeProfileRepository()),
+      ProviderScope(
+        overrides: [
+          httpClientProvider.overrideWith((ref) => _FakeHttpClient()),
+          authStorageProvider.overrideWith((ref) => _FakeAuthStorage()),
+          authRepositoryProvider.overrideWith((ref) => _FakeAuthRepository()),
+          mockLocationDetectorProvider.overrideWith((ref) => _FakeMockLocationDetector()),
+          usbDebugDetectorProvider.overrideWith((ref) => _FakeUsbDebugDetector()),
+          municipiosRepositoryProvider.overrideWith((ref) => _FakeMunicipiosRepository()),
+          profileRepositoryProvider.overrideWith((ref) => _FakeProfileRepository()),
         ],
         child: const JalaApp(),
       ),
     );
 
-    // Primer frame: el splash muestra el branding "Jala".
-    expect(find.text('Jala'), findsOneWidget);
-
-    // El splash programa un timer de 600ms + un redirect. Lo drenamos para
-    // no dejar timers colgados al terminar el test (sino el framework
-    // dispara "A Timer is still pending..."). Tras el redirect el usuario
-    // no tiene sesion (fake), asi que cae en Login — que tambien muestra "Jala".
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1500));
     await tester.pumpAndSettle();
+
     expect(find.text('Jala'), findsWidgets);
   });
 }

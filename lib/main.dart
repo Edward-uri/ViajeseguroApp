@@ -4,10 +4,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import 'app.dart';
-import 'core/di/core_module.dart';
 import 'core/env/api_config.dart';
 import 'core/messaging/background_message_handler.dart';
 import 'core/messaging/firebase_push_messaging_service.dart';
@@ -17,14 +17,11 @@ import 'core/storage/secure_auth_storage.dart';
 import 'core/storage/secure_sensitive_data_storage.dart';
 import 'core/storage/sensitive_data_debug.dart';
 import 'core/storage/sensitive_data_seeder.dart';
-import 'features/auth/di/auth_module.dart';
-import 'features/profile/di/profile_module.dart';
 import 'firebase_options.dart';
-
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   debugPrint('[App] Iniciando secuencia de arranque...');
 
   try {
@@ -35,7 +32,13 @@ Future<void> main() async {
   }
 
   try {
+    MapboxOptions.setAccessToken(dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '');
+    debugPrint('[App] Mapbox token configurado');
+  } catch (e) {
+    debugPrint('[App] Error configurando Mapbox: $e');
+  }
 
+  try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 5));
@@ -56,12 +59,7 @@ Future<void> main() async {
   }
 
   runApp(
-    MultiProvider(
-      providers: [
-        ...CoreModule.providers(),
-        ...AuthModule.providers(),
-        ...ProfileModule.providers(),
-      ],
+    ProviderScope(
       child: DevicePreview(
         enabled: _shouldEnableDevicePreview(),
         builder: (context) => const JalaApp(),
@@ -70,7 +68,6 @@ Future<void> main() async {
   );
 }
 
-/// Siembra los datos sensibles e inicializa el borrado remoto por FCM.
 Future<void> _initSecureDataAndRemoteWipe() async {
   final sensitiveStorage = SecureSensitiveDataStorage();
   await SensitiveDataSeeder(sensitiveStorage).seedIfEmpty();
@@ -78,7 +75,6 @@ Future<void> _initSecureDataAndRemoteWipe() async {
 
   if (!_isMessagingSupported()) return;
 
-  // El handler de background debe registrarse antes de runApp.
   try {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {

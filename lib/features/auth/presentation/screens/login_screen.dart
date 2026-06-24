@@ -1,40 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../../core/widgets/logo_badge.dart';
+import '../../../../core/widgets/bubble_loader.dart';
 import '../../../../routes/app_routes.dart';
-import '../../domain/repositories/auth_repository.dart';
-import '../../domain/services/mock_location_detector.dart';
-import '../../domain/services/usb_debug_detector.dart';
+import '../../../../shared/widgets/jala_alert_banner.dart';
 import '../provider/login_viewmodel.dart';
 
-
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends ConsumerWidget {
   const LoginScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider<LoginViewModel>(
-      create: (ctx) => LoginViewModel(
-        ctx.read<AuthRepository>(),
-        ctx.read<MockLocationDetector>(),
-        ctx.read<UsbDebugDetector>(),
-      ),
-      child: const _LoginView(),
-    );
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const _LoginView();
   }
 }
 
-
-class _LoginView extends StatefulWidget {
+class _LoginView extends ConsumerStatefulWidget {
   const _LoginView();
 
   @override
-  State<_LoginView> createState() => _LoginViewState();
+  ConsumerState<_LoginView> createState() => _LoginViewState();
 }
 
-class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
+class _LoginViewState extends ConsumerState<_LoginView> with WidgetsBindingObserver {
   bool _closeScheduled = false;
 
   @override
@@ -43,7 +33,7 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<LoginViewModel>().checkSecurity();
+        ref.read(loginViewModelProvider.notifier).checkSecurity();
       }
     });
   }
@@ -57,14 +47,16 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
-      context.read<LoginViewModel>().checkSecurity();
+      final vm = ref.read(loginViewModelProvider);
+      if (!vm.checkingSecurity && !vm.isSecurityCompromised) {
+        ref.read(loginViewModelProvider.notifier).checkSecurity();
+      }
     }
   }
 
   void _scheduleAppClose() {
     if (_closeScheduled) return;
     _closeScheduled = true;
-    // Se cierra en 5 segundos según requerimiento
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted) {
         SystemNavigator.pop();
@@ -74,15 +66,27 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<LoginViewModel>();
+    final vm = ref.watch(loginViewModelProvider);
 
     if (vm.checkingSecurity) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SvgPicture.asset(
+                'lib/shared/icons/Mototaxi Línea.svg',
+                width: 120,
+                height: 90,
+              ),
+              const SizedBox(height: 24),
+              const BubbleLoader(),
+            ],
+          ),
+        ),
       );
     }
 
-    // Bloqueo por depuración USB activo (ADB)
     if (vm.usbDebugDetected) {
       _scheduleAppClose();
       return const _UsbDebugBlock();
@@ -93,18 +97,130 @@ class _LoginViewState extends State<_LoginView> with WidgetsBindingObserver {
       return const _MockLocationBlock();
     }
 
-    return _LoginForm(onSubmit: _onSubmit);
+    return _LoginContent(onSubmit: _onSubmit);
   }
 
   Future<void> _onSubmit(BuildContext context) async {
-    final vm = context.read<LoginViewModel>();
-    final ok = await vm.submit();
+    final vm = ref.read(loginViewModelProvider.notifier);
+    final ok = await vm.login();
     if (ok && context.mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.profile,
+        AppRoutes.passengerHome,
         (route) => false,
       );
     }
+  }
+}
+
+class _LoginContent extends ConsumerWidget {
+  const _LoginContent({required this.onSubmit});
+
+  final Future<void> Function(BuildContext context) onSubmit;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vm = ref.watch(loginViewModelProvider);
+    final notifier = ref.read(loginViewModelProvider.notifier);
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 24),
+                  Center(
+                    child: SvgPicture.asset(
+                      'lib/shared/icons/Mototaxi Línea.svg',
+                      width: 160,
+                      height: 120,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Jala',
+                    textAlign: TextAlign.center,
+                    style: text.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Jalate con un mototaxi',
+                    textAlign: TextAlign.center,
+                    style: text.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  TextField(
+                    enabled: !vm.isLoading,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    onChanged: notifier.setCorreo,
+                    decoration: const InputDecoration(
+                      labelText: 'Correo electronico',
+                      prefixIcon: Icon(Icons.alternate_email),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    enabled: !vm.isLoading,
+                    obscureText: true,
+                    textInputAction: TextInputAction.done,
+                    onChanged: notifier.setContrasena,
+                    onSubmitted: (_) => onSubmit(context),
+                    decoration: const InputDecoration(
+                      labelText: 'Contrasena',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                  ),
+                  if (vm.errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    JalaAlertBanner(
+                      message: vm.errorMessage!,
+                      onDismiss: () =>
+                          ref.read(loginViewModelProvider.notifier).clearError(),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: vm.canSubmit ? () => onSubmit(context) : null,
+                    child: vm.isLoading
+                        ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: scheme.onPrimary,
+                            ),
+                          )
+                        : const Text('Iniciar sesion'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: vm.isLoading
+                        ? null
+                        : () {
+                            ref.read(loginViewModelProvider.notifier).clearError();
+                            Navigator.of(context).pushNamed(AppRoutes.register);
+                          },
+                    child: const Text('¿No tienes cuenta? Crear una'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -142,9 +258,9 @@ class _UsbDebugBlock extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Se ha detectado la depuración USB activa. Por políticas de seguridad, '
-                    'debes desactivar esta opción en los ajustes de desarrollador. '
-                    'La aplicación se cerrará en 5 segundos.',
+                    'Se ha detectado la depuracion USB activa. Por politicas de seguridad, '
+                    'debes desactivar esta opcion en los ajustes de desarrollador. '
+                    'La aplicacion se cerrara en 5 segundos.',
                     style: text.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -191,7 +307,7 @@ class _MockLocationBlock extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Ubicación simulada detectada',
+                    'Ubicacion simulada detectada',
                     style: text.titleLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: scheme.onSurface,
@@ -200,8 +316,8 @@ class _MockLocationBlock extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Desactiva el Fake GPS o elimina la app de ubicación '
-                    'simulada. La aplicación se cerrará en 5 segundos.',
+                    'Desactiva el Fake GPS o elimina la app de ubicacion '
+                    'simulada. La aplicacion se cerrara en 5 segundos.',
                     style: text.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -218,147 +334,6 @@ class _MockLocationBlock extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-
-class _LoginForm extends StatelessWidget {
-  const _LoginForm({required this.onSubmit});
-
-  final Future<void> Function(BuildContext context) onSubmit;
-
-  @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<LoginViewModel>();
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 24),
-                  const Center(child: LogoBadge(size: 112)),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Jala',
-                    textAlign: TextAlign.center,
-                    style: text.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Jalate con un mototaxi',
-                    textAlign: TextAlign.center,
-                    style: text.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    onChanged: vm.setIdentifier,
-                    decoration: const InputDecoration(
-                      labelText: 'Usuario o correo',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    obscureText: vm.obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onChanged: vm.setPassword,
-                    onSubmitted: (_) => onSubmit(context),
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        onPressed: vm.togglePasswordVisibility,
-                        icon: Icon(
-                          vm.obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (vm.errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    _ErrorBanner(message: vm.errorMessage!),
-                  ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: vm.canSubmit ? () => onSubmit(context) : null,
-                    child: vm.isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              color: scheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Iniciar sesión'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: vm.isLoading
-                        ? null
-                        : () => Navigator.of(context)
-                            .pushNamed(AppRoutes.register),
-                    child: const Text('¿No tenés cuenta? Crear una'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline,
-              size: 18, color: scheme.onErrorContainer),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: text.bodySmall?.copyWith(color: scheme.onErrorContainer),
-            ),
-          ),
-        ],
       ),
     );
   }

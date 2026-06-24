@@ -2,11 +2,15 @@ import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 
 import 'core/navigation/app_navigator.dart';
+import 'core/widgets/page_transitions.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
 import 'features/passenger/home/presentation/screens/passenger_home_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/splash/presentation/splash_screen.dart';
+import 'features/trip/trip-in-progress/domain/entities/trip.dart';
+import 'features/trip/trip-in-progress/presentation/screens/trip_in_progress_screen.dart';
+import 'features/trip/trip-searching/presentation/screens/trip_searching_screen.dart';
 import 'routes/app_routes.dart';
 import 'theme/theme.dart';
 import 'theme/util.dart';
@@ -32,12 +36,26 @@ class JalaApp extends StatelessWidget {
       themeMode:
           brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
       initialRoute: AppRoutes.login,
-      routes: <String, WidgetBuilder>{
-        AppRoutes.splash: (_) => const SplashScreen(),
-        AppRoutes.login: (_) => const LoginScreen(),
-        AppRoutes.register: (_) => const RegisterScreen(),
-        AppRoutes.profile: (_) => const ProfileScreen(),
-        AppRoutes.passengerHome: (_) => const PassengerHomeScreen(),
+      onGenerateRoute: (settings) {
+        switch (settings.name) {
+          case AppRoutes.splash:
+            return PageTransitions.fadeThrough(const SplashScreen());
+          case AppRoutes.login:
+            return PageTransitions.slideUp(const LoginScreen());
+          case AppRoutes.register:
+            return PageTransitions.slideRight(const RegisterScreen());
+          case AppRoutes.profile:
+            return PageTransitions.scaleFade(const ProfileScreen());
+          case AppRoutes.passengerHome:
+            return PageTransitions.fadeThrough(const PassengerHomeScreen());
+          case AppRoutes.tripSearching:
+            return PageTransitions.slideUp(const TripSearchingScreen());
+          case AppRoutes.tripInProgress:
+            final trip = settings.arguments as Trip;
+            return PageTransitions.slideUp(TripInProgressScreen(trip: trip));
+          default:
+            return PageTransitions.fadeThrough(const LoginScreen());
+        }
       },
     );
   }

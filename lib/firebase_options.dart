@@ -43,47 +43,47 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions get web => FirebaseOptions(
     apiKey: dotenv.get('FIREBASE_API_KEY_WEB'),
-    appId: '1:883656038491:web:4073fee51ce1240a58477e',
-    messagingSenderId: '883656038491',
-    projectId: 'jala-e3484',
-    authDomain: 'jala-e3484.firebaseapp.com',
-    storageBucket: 'jala-e3484.firebasestorage.app',
+    appId: '1:963153744458:web:4073fee51ce1240a58477e',
+    messagingSenderId: '963153744458',
+    projectId: 'jala-devs',
+    authDomain: 'jala-devs.firebaseapp.com',
+    storageBucket: 'jala-devs.firebasestorage.app',
     measurementId: 'G-FN71VCQ5VH',
   );
 
   static FirebaseOptions get android => FirebaseOptions(
     apiKey: dotenv.get('FIREBASE_API_KEY_ANDROID'),
-    appId: '1:883656038491:android:b51c0b5699a90eaa58477e',
-    messagingSenderId: '883656038491',
-    projectId: 'jala-e3484',
-    storageBucket: 'jala-e3484.firebasestorage.app',
+    appId: '1:963153744458:android:b8385e65cdd0098b34ccb3',
+    messagingSenderId: '963153744458',
+    projectId: 'jala-devs',
+    storageBucket: 'jala-devs.firebasestorage.app',
   );
 
   static FirebaseOptions get ios => FirebaseOptions(
     apiKey: dotenv.get('FIREBASE_API_KEY_IOS'),
-    appId: '1:883656038491:ios:166d5fbd537e2eaa58477e',
-    messagingSenderId: '883656038491',
-    projectId: 'jala-e3484',
-    storageBucket: 'jala-e3484.firebasestorage.app',
-    iosBundleId: 'com.uriel.viajeseguroapp',
+    appId: '1:963153744458:ios:166d5fbd537e2eaa58477e',
+    messagingSenderId: '963153744458',
+    projectId: 'jala-devs',
+    storageBucket: 'jala-devs.firebasestorage.app',
+    iosBundleId: 'com.jala.pasajero',
   );
 
   static FirebaseOptions get macos => FirebaseOptions(
     apiKey: dotenv.get('FIREBASE_API_KEY_IOS'),
-    appId: '1:883656038491:ios:166d5fbd537e2eaa58477e',
-    messagingSenderId: '883656038491',
-    projectId: 'jala-e3484',
-    storageBucket: 'jala-e3484.firebasestorage.app',
-    iosBundleId: 'com.uriel.viajeseguroapp',
+    appId: '1:963153744458:ios:166d5fbd537e2eaa58477e',
+    messagingSenderId: '963153744458',
+    projectId: 'jala-devs',
+    storageBucket: 'jala-devs.firebasestorage.app',
+    iosBundleId: 'com.jala.pasajero',
   );
 
   static FirebaseOptions get windows => FirebaseOptions(
     apiKey: dotenv.get('FIREBASE_API_KEY_WEB'),
-    appId: '1:883656038491:web:ff6b28aae877b4a358477e',
-    messagingSenderId: '883656038491',
-    projectId: 'jala-e3484',
-    authDomain: 'jala-e3484.firebaseapp.com',
-    storageBucket: 'jala-e3484.firebasestorage.app',
+    appId: '1:963153744458:web:ff6b28aae877b4a358477e',
+    messagingSenderId: '963153744458',
+    projectId: 'jala-devs',
+    authDomain: 'jala-devs.firebaseapp.com',
+    storageBucket: 'jala-devs.firebasestorage.app',
     measurementId: 'G-ZMSKSPPJVM',
   );
 }

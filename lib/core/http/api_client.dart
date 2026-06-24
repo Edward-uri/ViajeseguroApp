@@ -5,23 +5,31 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../env/api_config.dart';
+import '../routes/api_routes.dart';
 import '../storage/auth_storage.dart';
 import 'api_exception.dart';
 
+typedef OnAuthFailure = void Function();
 
 class ApiClient {
-  ApiClient(this._client, this._authStorage, {this.baseUrl = ApiConfig.baseUrl});
+  ApiClient(
+    this._client,
+    this._authStorage, {
+    this.baseUrl = ApiConfig.baseUrl,
+    this.onAuthFailure,
+  });
 
   final http.Client _client;
   final AuthStorage _authStorage;
   final String baseUrl;
+  final OnAuthFailure? onAuthFailure;
 
-  Future<Map<String, dynamic>> get(String path, {bool auth = true}) async {
-    return _send(
-      () async => _client.get(
-        _uri(path),
-        headers: await _headers(auth: auth),
-      ),
+  bool _isRefreshing = false;
+
+  Future<Map<String, dynamic>> get(String path, {bool auth = true}) {
+    return _sendRequest(
+      (headers) => _client.get(_uri(path), headers: headers),
+      auth: auth,
     );
   }
 
@@ -29,13 +37,15 @@ class ApiClient {
     String path, {
     Object? body,
     bool auth = false,
-  }) async {
-    return _send(
-      () async => _client.post(
+  }) {
+    return _sendRequest(
+      (headers) => _client.post(
         _uri(path),
-        headers: await _headers(auth: auth, hasBody: true),
+        headers: headers,
         body: body == null ? null : jsonEncode(body),
       ),
+      auth: auth,
+      hasBody: true,
     );
   }
 
@@ -43,27 +53,39 @@ class ApiClient {
     String path, {
     Object? body,
     bool auth = true,
-  }) async {
-    return _send(
-      () async => _client.put(
+  }) {
+    return _sendRequest(
+      (headers) => _client.put(
         _uri(path),
-        headers: await _headers(auth: auth, hasBody: true),
+        headers: headers,
         body: body == null ? null : jsonEncode(body),
       ),
+      auth: auth,
+      hasBody: true,
     );
   }
 
   Future<void> delete(String path, {bool auth = true}) async {
+    final headers = await _headers(auth: auth);
     final response = await _runWithErrors(
-      () async => _client.delete(
-        _uri(path),
-        headers: await _headers(auth: auth),
-      ),
+      () => _client.delete(_uri(path), headers: headers),
     );
+
+    if (response.statusCode == 401 && auth) {
+      final refreshed = await _tryRefreshToken();
+      if (refreshed) {
+        final newHeaders = await _headers(auth: auth);
+        final retry = await _runWithErrors(
+          () => _client.delete(_uri(path), headers: newHeaders),
+        );
+        _throwIfError(retry);
+        return;
+      }
+    }
+
     _throwIfError(response);
   }
 
-  
   Uri _uri(String path) =>
       Uri.parse('$baseUrl${path.startsWith('/') ? path : '/$path'}');
 
@@ -82,11 +104,27 @@ class ApiClient {
     return headers;
   }
 
+  Future<Map<String, dynamic>> _sendRequest(
+    Future<http.Response> Function(Map<String, String> headers) requestBuilder, {
+    required bool auth,
+    bool hasBody = false,
+    bool isRetry = false,
+  }) async {
+    final headers = await _headers(auth: auth, hasBody: hasBody);
+    final response = await _runWithErrors(() => requestBuilder(headers));
 
-  Future<Map<String, dynamic>> _send(
-    Future<http.Response> Function() send,
-  ) async {
-    final response = await _runWithErrors(send);
+    if (response.statusCode == 401 && auth && !isRetry) {
+      final refreshed = await _tryRefreshToken();
+      if (refreshed) {
+        return _sendRequest(
+          requestBuilder,
+          auth: auth,
+          hasBody: hasBody,
+          isRetry: true,
+        );
+      }
+    }
+
     _throwIfError(response);
     if (response.body.isEmpty) return const <String, dynamic>{};
     final decoded = jsonDecode(response.body);
@@ -95,6 +133,64 @@ class ApiClient {
       'Respuesta del servidor en formato inesperado',
       statusCode: response.statusCode,
     );
+  }
+
+  Future<bool> _tryRefreshToken() async {
+    if (_isRefreshing) return false;
+    _isRefreshing = true;
+
+    try {
+      final refreshToken = await _authStorage.readRefreshToken();
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _notifyAuthFailure();
+        return false;
+      }
+
+      final response = await _client
+          .post(
+            _uri(ApiRoutes.refresh),
+            headers: const {
+              'Accept': 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
+          .timeout(ApiConfig.requestTimeout);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        await _authStorage.clear();
+        _notifyAuthFailure();
+        return false;
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final newAccessToken = decoded['accessToken'] as String?;
+      final newRefreshToken = decoded['refreshToken'] as String?;
+
+      if (newAccessToken == null || newAccessToken.isEmpty) {
+        await _authStorage.clear();
+        _notifyAuthFailure();
+        return false;
+      }
+
+      await _authStorage.writeToken(newAccessToken);
+      if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+        await _authStorage.writeRefreshToken(newRefreshToken);
+      }
+      return true;
+    } catch (_) {
+      await _authStorage.clear();
+      _notifyAuthFailure();
+      return false;
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  void _notifyAuthFailure() {
+    if (onAuthFailure != null) {
+      Future.microtask(() => onAuthFailure!());
+    }
   }
 
   Future<http.Response> _runWithErrors(
@@ -111,7 +207,6 @@ class ApiClient {
     }
   }
 
- 
   void _throwIfError(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) return;
 
@@ -124,8 +219,7 @@ class ApiClient {
         message = err['message']?.toString() ?? message;
         details = err['details'];
       }
-    } catch (_) {
-    }
+    } catch (_) {}
 
     switch (response.statusCode) {
       case 401:

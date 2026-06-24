@@ -1,159 +1,98 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../../../routes/app_routes.dart';
-import '../../domain/repositories/auth_repository.dart';
 import '../provider/register_viewmodel.dart';
+import 'register_email_step.dart';
+import 'register_form_additional_step.dart';
+import 'register_form_personal_step.dart';
+import 'register_otp_step.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider<RegisterViewModel>(
-      create: (ctx) => RegisterViewModel(ctx.read<AuthRepository>()),
-      child: const _RegisterView(),
-    );
-  }
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterView extends StatelessWidget {
-  const _RegisterView();
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(registerViewModelProvider.notifier).resetToEmail();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<RegisterViewModel>();
+    final state = ref.watch(registerViewModelProvider);
+    final vm = ref.read(registerViewModelProvider.notifier);
     final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
 
     return Scaffold(
+      backgroundColor: scheme.surface,
       appBar: AppBar(
-        title: const Text('Crear cuenta'),
+        backgroundColor: scheme.surface,
+        elevation: 0,
+        leading: state.step == RegisterStep.email
+            ? IconButton(
+                icon: Icon(Icons.close, color: scheme.onSurface),
+                onPressed: () {
+                  vm.resetToEmail();
+                  Navigator.of(context).pop();
+                },
+              )
+            : IconButton(
+                icon: Icon(Icons.arrow_back, color: scheme.onSurface),
+                onPressed: () {
+                  switch (state.step) {
+                    case RegisterStep.otp:
+                      vm.goBackToEmail();
+                      break;
+                    case RegisterStep.formPersonal:
+                      vm.goBackToOtp();
+                      break;
+                    case RegisterStep.formAdditional:
+                      vm.goBackToPersonalForm();
+                      break;
+                    default:
+                      break;
+                  }
+                },
+              ),
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Tus datos',
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
-                    ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 32),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 32),
+                Center(
+                  child: SvgPicture.asset(
+                    'lib/shared/icons/Mototaxi Línea.svg',
+                    width: 160,
+                    height: 120,
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    textInputAction: TextInputAction.next,
-                    onChanged: vm.setNombre,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre',
-                    ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Jala',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                    letterSpacing: 2.4,
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    textInputAction: TextInputAction.next,
-                    onChanged: vm.setApellidoPaterno,
-                    decoration: const InputDecoration(
-                      labelText: 'Apellido paterno',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    textInputAction: TextInputAction.next,
-                    onChanged: vm.setApellidoMaterno,
-                    decoration: const InputDecoration(
-                      labelText: 'Apellido materno (opcional)',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                    onChanged: vm.setTelefono,
-                    decoration: const InputDecoration(
-                      labelText: 'Teléfono (opcional)',
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Cuenta',
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    onChanged: vm.setCorreo,
-                    decoration: const InputDecoration(
-                      labelText: 'Correo electrónico',
-                      prefixIcon: Icon(Icons.alternate_email),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    textInputAction: TextInputAction.next,
-                    onChanged: vm.setNombreUsuario,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre de usuario',
-                      prefixIcon: Icon(Icons.person_outline),
-                      helperText: 'Mínimo 3 caracteres',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    obscureText: vm.obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onChanged: vm.setPassword,
-                    onSubmitted: (_) => _onSubmit(context),
-                    decoration: InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      helperText: 'Mínimo 8 caracteres',
-                      suffixIcon: IconButton(
-                        onPressed: vm.togglePasswordVisibility,
-                        icon: Icon(
-                          vm.obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (vm.errorMessage != null) ...[
-                    const SizedBox(height: 16),
-                    _ErrorBanner(message: vm.errorMessage!),
-                  ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: vm.canSubmit ? () => _onSubmit(context) : null,
-                    child: vm.isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              color: scheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Crear cuenta'),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 16),
+                _buildAnimatedStep(state, vm),
+              ],
             ),
           ),
         ),
@@ -161,47 +100,45 @@ class _RegisterView extends StatelessWidget {
     );
   }
 
-  Future<void> _onSubmit(BuildContext context) async {
-    final vm = context.read<RegisterViewModel>();
-    final ok = await vm.submit();
-    if (ok && context.mounted) {
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.profile,
-        (route) => false,
-      );
-    }
-  }
-}
+  Widget _buildAnimatedStep(
+    RegisterViewModelState state,
+    RegisterViewModel vm,
+  ) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        final offsetAnimation = Tween<Offset>(
+          begin: const Offset(0.1, 0.0),
+          end: Offset.zero,
+        ).animate(animation);
 
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline,
-              size: 18, color: scheme.onErrorContainer),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: text.bodySmall?.copyWith(color: scheme.onErrorContainer),
-            ),
+        return SlideTransition(
+          position: offsetAnimation,
+          child: FadeTransition(
+            opacity: animation,
+            child: child,
           ),
-        ],
-      ),
+        );
+      },
+      child: _buildStep(state, vm),
     );
+  }
+
+  Widget _buildStep(
+    RegisterViewModelState state,
+    RegisterViewModel vm,
+  ) {
+    switch (state.step) {
+      case RegisterStep.email:
+        return EmailStep(key: const ValueKey('email'), vm: vm, state: state);
+      case RegisterStep.otp:
+        return OtpStep(key: const ValueKey('otp'), vm: vm, state: state, correo: vm.correo);
+      case RegisterStep.formPersonal:
+        return FormPersonalStep(key: const ValueKey('personal'), vm: vm, state: state);
+      case RegisterStep.formAdditional:
+        return FormAdditionalStep(key: const ValueKey('additional'), vm: vm, state: state);
+    }
   }
 }

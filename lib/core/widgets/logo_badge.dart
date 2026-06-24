@@ -35,7 +35,7 @@ class LogoBadge extends StatelessWidget {
         ],
       ),
       child: SvgPicture.asset(
-        'assets/logo.svg',
+        'lib/shared/icons/Mototaxi Línea.svg',
         width: size * 0.6,
         height: size * 0.6,
         semanticsLabel: 'Jala',
