@@ -1,24 +1,17 @@
-import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
-import 'package:provider/single_child_widget.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/http/api_client.dart';
+import '../../../core/di/core_module.dart';
 import '../data/profile_repository_impl.dart';
 import '../data/remote/profile_api.dart';
 import '../domain/repositories/profile_repository.dart';
 
-class ProfileModule {
-  const ProfileModule._();
+final profileApiProvider = Provider<ProfileApi>((ref) {
+  return ProfileApi(
+    ref.watch(apiClientProvider),
+    ref.watch(httpClientProvider),
+  );
+});
 
-  static List<SingleChildWidget> providers() => <SingleChildWidget>[
-        Provider<ProfileApi>(
-          create: (ctx) => ProfileApi(
-            ctx.read<ApiClient>(),
-            ctx.read<http.Client>(),
-          ),
-        ),
-        Provider<ProfileRepository>(
-          create: (ctx) => ProfileRepositoryImpl(ctx.read<ProfileApi>()),
-        ),
-      ];
-}
+final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
+  return ProfileRepositoryImpl(ref.watch(profileApiProvider));
+});

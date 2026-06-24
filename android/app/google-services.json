@@ -1,21 +1,40 @@
 {
   "project_info": {
-    "project_number": "883656038491",
-    "project_id": "jala-e3484",
-    "storage_bucket": "jala-e3484.firebasestorage.app"
+    "project_number": "963153744458",
+    "project_id": "jala-devs",
+    "storage_bucket": "jala-devs.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:883656038491:android:b51c0b5699a90eaa58477e",
+        "mobilesdk_app_id": "1:963153744458:android:b8385e65cdd0098b34ccb3",
         "android_client_info": {
-          "package_name": "com.uriel.viajeseguroapp"
+          "package_name": "com.jala.pasajero"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAYiGfwpsNeA7Rp6UMeom-tHKFXdxXau0w"
+          "current_key": "AIzaSyC0t1-fFk1a1ltroHRVySMXcCfgv7yMjt0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:963153744458:android:a933c405941b9bf334ccb3",
+        "android_client_info": {
+          "package_name": "com.jala.viajeseguroconductor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0t1-fFk1a1ltroHRVySMXcCfgv7yMjt0"
         }
       ],
       "services": {

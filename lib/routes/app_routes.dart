@@ -6,4 +6,6 @@ class AppRoutes {
   static const String register = '/register';
   static const String profile = '/profile';
   static const String passengerHome = '/passenger/home';
+  static const String tripSearching = '/trip/searching';
+  static const String tripInProgress = '/trip/in-progress';
 }

@@ -1,13 +1,33 @@
 import '../../../../shared/domain/entities/user.dart';
 import '../entities/register_params.dart';
 
-
 abstract class AuthRepository {
-  Future<User> login({required String identifier, required String password});
+  Future<void> registerStart({required String correo, String rol});
 
-  Future<User> register(RegisterParams params);
+  Future<String> registerVerify({
+    required String correo,
+    required String codigo,
+    String rol,
+  });
 
-  Future<void> logout();
+  Future<User> registerComplete(RegisterParams params);
+
+  Future<User> loginWithPassword({
+    required String correo,
+    required String contrasena,
+    String? dispositivo,
+  });
+
+  Future<void> logout({String? refreshToken});
 
   Future<bool> hasSession();
+
+  Future<User?> getCurrentUser();
+
+  Future<void> registrarDispositivo({
+    required String plataforma,
+    required String version,
+    String? modelo,
+    String? tokenPush,
+  });
 }

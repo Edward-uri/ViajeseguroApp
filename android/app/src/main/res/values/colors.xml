@@ -2,5 +2,6 @@
 <resources>
     <!-- Fondo del splash nativo (modo claro): crema cálido = surface de la app.
          Evita el flash blanco antes de que Flutter dibuje el primer frame. -->
-    <color name="launch_bg">#FBF7F2</color>
+    <color name="launch_bg">#F6F6F6</color>
+	<color name="ic_launcher_background">#F6F6F6</color>
 </resources>

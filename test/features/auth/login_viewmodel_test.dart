@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:viajeseguroapp/core/auth/current_user_provider.dart';
 import 'package:viajeseguroapp/features/auth/domain/entities/register_params.dart';
 import 'package:viajeseguroapp/features/auth/domain/repositories/auth_repository.dart';
 import 'package:viajeseguroapp/features/auth/domain/services/mock_location_detector.dart';
@@ -10,12 +11,21 @@ class _StubAuthRepository implements AuthRepository {
   @override
   Future<bool> hasSession() async => false;
   @override
-  Future<User> login({required String identifier, required String password}) =>
+  Future<User> loginWithPassword({required String correo, required String contrasena, String? dispositivo}) =>
       throw UnimplementedError();
   @override
-  Future<User> register(RegisterParams params) => throw UnimplementedError();
+  Future<void> registerStart({required String correo, String rol = 'pasajero'}) async {}
   @override
-  Future<void> logout() async {}
+  Future<String> registerVerify({required String correo, required String codigo, String rol = 'pasajero'}) =>
+      throw UnimplementedError();
+  @override
+  Future<User> registerComplete(RegisterParams params) => throw UnimplementedError();
+  @override
+  Future<void> logout({String? refreshToken}) async {}
+  @override
+  Future<User?> getCurrentUser() async => null;
+  @override
+  Future<void> registrarDispositivo({required String plataforma, required String version, String? modelo, String? tokenPush}) async {}
 }
 
 class _StubLocationDetector implements MockLocationDetector {
@@ -46,26 +56,36 @@ void main() {
         () async {
       final detector = _StubLocationDetector(true);
       final usb = _StubUsbDetector(false);
-      final vm = LoginViewModel(_StubAuthRepository(), detector, usb);
+      final vm = LoginViewModel(
+        _StubAuthRepository(),
+        detector,
+        usb,
+        CurrentUserNotifier(),
+      );
 
       await vm.checkSecurity();
 
       expect(detector.calls, 1);
-      expect(vm.mockLocationDetected, isTrue);
-      expect(vm.checkingSecurity, isFalse);
+      expect(vm.state.mockLocationDetected, isTrue);
+      expect(vm.state.checkingSecurity, isFalse);
     });
 
     test('marca usbDebugDetected = true cuando el detector lo reporta',
         () async {
       final detector = _StubLocationDetector(false);
       final usb = _StubUsbDetector(true);
-      final vm = LoginViewModel(_StubAuthRepository(), detector, usb);
+      final vm = LoginViewModel(
+        _StubAuthRepository(),
+        detector,
+        usb,
+        CurrentUserNotifier(),
+      );
 
       await vm.checkSecurity();
 
       expect(usb.calls, 1);
-      expect(vm.usbDebugDetected, isTrue);
-      expect(vm.checkingSecurity, isFalse);
+      expect(vm.state.usbDebugDetected, isTrue);
+      expect(vm.state.checkingSecurity, isFalse);
     });
 
     test('deja todo en false cuando no hay riesgos detectados', () async {
@@ -73,13 +93,14 @@ void main() {
         _StubAuthRepository(),
         _StubLocationDetector(false),
         _StubUsbDetector(false),
+        CurrentUserNotifier(),
       );
 
       await vm.checkSecurity();
 
-      expect(vm.mockLocationDetected, isFalse);
-      expect(vm.usbDebugDetected, isFalse);
-      expect(vm.checkingSecurity, isFalse);
+      expect(vm.state.mockLocationDetected, isFalse);
+      expect(vm.state.usbDebugDetected, isFalse);
+      expect(vm.state.checkingSecurity, isFalse);
     });
 
     test('arranca en estado "verificando" antes de la primera consulta', () {
@@ -87,11 +108,12 @@ void main() {
         _StubAuthRepository(),
         _StubLocationDetector(false),
         _StubUsbDetector(false),
+        CurrentUserNotifier(),
       );
 
-      expect(vm.checkingSecurity, isTrue);
-      expect(vm.mockLocationDetected, isFalse);
-      expect(vm.usbDebugDetected, isFalse);
+      expect(vm.state.checkingSecurity, isTrue);
+      expect(vm.state.mockLocationDetected, isFalse);
+      expect(vm.state.usbDebugDetected, isFalse);
     });
   });
 }

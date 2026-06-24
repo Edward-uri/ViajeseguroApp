@@ -1,87 +1,94 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/widgets/logo_badge.dart';
+import '../../../../core/auth/current_user_provider.dart';
+import '../../../../core/widgets/bubble_loader.dart';
 import '../../../routes/app_routes.dart';
-import '../../../theme/theme.dart';
-import '../../auth/domain/repositories/auth_repository.dart';
+import '../../auth/di/auth_module.dart';
 
-
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen>
+    with TickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    ));
+
+    _controller.forward();
     WidgetsBinding.instance.addPostFrameCallback((_) => _decideRoute());
   }
 
   Future<void> _decideRoute() async {
-    final authRepo = context.read<AuthRepository>();
+    final authRepo = ref.read(authRepositoryProvider);
     final results = await Future.wait<dynamic>([
       authRepo.hasSession(),
-      Future<void>.delayed(const Duration(milliseconds: 600)),
+      authRepo.getCurrentUser(),
+      Future<void>.delayed(const Duration(milliseconds: 1200)),
     ]);
     final hasSession = results[0] as bool;
+    final user = results[1];
     if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(
-      hasSession ? AppRoutes.profile : AppRoutes.login,
-    );
+    if (hasSession && user != null) {
+      ref.read(currentUserProvider.notifier).setUser(user);
+      Navigator.of(context).pushReplacementNamed(AppRoutes.passengerHome);
+    } else {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-
     return Scaffold(
-      backgroundColor: scheme.surface,
+      backgroundColor: const Color(0xFFF6F6F6),
       body: Center(
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: 1),
-          duration: const Duration(milliseconds: 520),
-          curve: Curves.easeOutCubic,
-          builder: (context, t, child) => Opacity(
-            opacity: t,
-            child: Transform.translate(
-              offset: Offset(0, (1 - t) * 16),
-              child: child,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'lib/shared/icons/logo_mototaxi_linea.png',
+                  width: 320,
+                  height: 240,
+                ),
+                const SizedBox(height: 40),
+                const BubbleLoader(size: 20),
+                const SizedBox(height: 60),
+              ],
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const LogoBadge(size: 148),
-              const SizedBox(height: 28),
-              Text(
-                'Jala',
-                style: text.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Tu mototaxi, a un toque',
-                style: text.bodyMedium?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 36),
-              const SizedBox(
-                width: 26,
-                height: 26,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: JalaBrand.amber,
-                ),
-              ),
-            ],
           ),
         ),
       ),

@@ -1,25 +1,25 @@
 class RegisterParams {
   const RegisterParams({
-    required this.nombreUsuario,
-    required this.password,
-    required this.rol,
+    required this.registrationToken,
     required this.nombre,
     required this.apellidoPaterno,
-    required this.correoElectronico,
+    required this.contrasena,
     this.apellidoMaterno,
-    this.idSexo,
     this.telefono,
+    this.idSexo,
     this.fechaNacimiento,
+    this.idMunicipio,
+    this.dispositivo,
   });
 
-  final String nombreUsuario;
-  final String password;
-  final String rol;
+  final String registrationToken;
   final String nombre;
   final String apellidoPaterno;
-  final String correoElectronico;
+  final String contrasena;
   final String? apellidoMaterno;
-  final int? idSexo;
   final String? telefono;
+  final int? idSexo;
   final String? fechaNacimiento;
+  final int? idMunicipio;
+  final String? dispositivo;
 }

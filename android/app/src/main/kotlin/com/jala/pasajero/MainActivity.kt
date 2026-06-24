@@ -1,4 +1,4 @@
-package com.uriel.viajeseguroapp
+package com.jala.pasajero
 
 import android.os.Bundle
 import android.provider.Settings

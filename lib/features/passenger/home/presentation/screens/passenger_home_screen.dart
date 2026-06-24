@@ -1,337 +1,247 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart' as geo;
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
-import '../../../../profile/domain/repositories/profile_repository.dart';
+import '../../../../../core/auth/current_user_provider.dart';
+import '../../../../../core/di/core_module.dart';
+import '../../../../../routes/app_routes.dart';
+import '../../../../../shared/widgets/widgets.dart';
+import '../../../../auth/di/auth_module.dart';
+import '../../../../trip/trip-history/presentation/screens/trip_history_screen.dart';
 import '../provider/passenger_home_viewmodel.dart';
 
-
-class PassengerHomeScreen extends StatelessWidget {
+class PassengerHomeScreen extends ConsumerStatefulWidget {
   const PassengerHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider<PassengerHomeViewModel>(
-      create: (ctx) => PassengerHomeViewModel(
-        ctx.read<ProfileRepository>(),
-      )..loadUser(),
-      child: const _PassengerHomeView(),
-    );
-  }
+  ConsumerState<PassengerHomeScreen> createState() => _PassengerHomeScreenState();
 }
 
-class _PassengerHomeView extends StatelessWidget {
-  const _PassengerHomeView();
+class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen> {
+  MapboxMap? _mapboxMap;
+
+  static const _navDestinations = [
+    JalaNavDestination(icon: Icons.home_rounded),
+    JalaNavDestination(icon: Icons.receipt_long_rounded),
+    JalaNavDestination(icon: Icons.person_outline_rounded),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(passengerHomeViewModelProvider.notifier).loadUser();
+    });
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      geo.LocationPermission permission = await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
+        if (permission == geo.LocationPermission.denied) return;
+      }
+      if (permission == geo.LocationPermission.deniedForever) return;
+
+      final position = await geo.Geolocator.getCurrentPosition(
+        desiredAccuracy: geo.LocationAccuracy.high,
+      );
+
+      if (mounted) {
+        _flyTo(position.latitude, position.longitude);
+      }
+    } catch (e) {
+      debugPrint('Error obteniendo ubicación: $e');
+    }
+  }
+
+  void _flyTo(double latitude, double longitude) {
+    _mapboxMap?.flyTo(
+      CameraOptions(
+        center: Point(coordinates: Position(longitude, latitude)),
+        zoom: 16.0,
+      ),
+      MapAnimationOptions(duration: 1000, startDelay: 0),
+    );
+  }
+
+  void _onMapCreated(MapboxMap mapboxMap) {
+    _mapboxMap = mapboxMap;
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final ok = await JalaDialog.confirm(
+      context,
+      title: 'Cerrar sesion',
+      message: '¿Seguro que quieres cerrar sesion?',
+      confirmText: 'Cerrar sesion',
+      type: JalaAlertType.warning,
+    );
+    if (!ok || !context.mounted) return;
+
+    final refreshToken =
+        await ref.read(authStorageProvider).readRefreshToken();
+    try {
+      await ref.read(authRepositoryProvider).logout(
+            refreshToken: refreshToken,
+          );
+    } catch (_) {}
+    ref.read(currentUserProvider.notifier).clear();
+    if (context.mounted) {
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.login,
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<PassengerHomeViewModel>();
+    final vm = ref.watch(passengerHomeViewModelProvider);
+    final user = ref.watch(currentUserProvider);
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+    final userName = user?.nombreCompleto ?? vm.greetingName;
+    final userInitials = user?.iniciales ?? '?';
+    final userSubtitle = user?.correoElectronico ?? user?.telefono ?? '';
 
     return Scaffold(
       body: Stack(
         children: [
-          _MapPlaceholder(),
+          if (vm.selectedIndex == 0)
+            _buildHomeTab(vm, bottomPad, context)
+          else if (vm.selectedIndex == 1)
+            _buildTripsTab()
+          else
+            _buildProfileTab(context, userName, userInitials, userSubtitle),
           Positioned(
             left: 0,
             right: 0,
-            bottom: 84,
-            child: _BottomSheet(
-              greetingName: vm.greetingName,
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: _BottomNavBar(
-        selectedIndex: vm.selectedIndex,
-        onTabSelected: vm.selectTab,
-      ),
-    );
-  }
-}
-
-class _MapPlaceholder extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: colorScheme.surfaceContainerHighest,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.map_outlined,
-              size: 48,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Mapa',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _BottomSheet extends StatelessWidget {
-  const _BottomSheet({required this.greetingName});
-
-  final String greetingName;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(28),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 24,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 14),
-          Container(
-            width: 44,
-            height: 5,
-            decoration: BoxDecoration(
-              color: colorScheme.outlineVariant,
-              borderRadius: BorderRadius.circular(2.5),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hola, $greetingName 👋',
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '¿A dónde vas?',
-                  style: textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _SearchBar(),
-                const SizedBox(height: 20),
-                _SavedAddress(
-                  icon: Icons.home_outlined,
-                  title: 'Casa',
-                  subtitle: 'Av. Hidalgo 123',
-                ),
-                const SizedBox(height: 14),
-                _SavedAddress(
-                  icon: Icons.work_outline,
-                  title: 'Trabajo',
-                  subtitle: 'Primaria 5 de mayo',
-                ),
-                const SizedBox(height: 24),
-              ],
+            bottom: 0,
+            child: JalaBottomNavBar(
+              selectedIndex: vm.selectedIndex,
+              onTabSelected: (index) =>
+                  ref.read(passengerHomeViewModelProvider.notifier).selectTab(index),
+              destinations: _navDestinations,
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _SearchBar extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outlineVariant,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 16),
-          Icon(
-            Icons.search,
-            color: colorScheme.onSurfaceVariant,
-            size: 22,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            'Buscar destino',
-            style: textTheme.bodyLarge?.copyWith(
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SavedAddress extends StatelessWidget {
-  const _SavedAddress({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Row(
+  Widget _buildHomeTab(
+    PassengerHomeViewModelState vm,
+    double bottomPad,
+    BuildContext context,
+  ) {
+    return Stack(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: colorScheme.secondaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: colorScheme.secondary,
-            size: 22,
+        JalaMapView(
+          onMapCreated: _onMapCreated,
+          showLocationMarker: false,
+          showCurrentLocationPin: true,
+        ),
+        Positioned(
+          right: 24,
+          bottom: 100 + bottomPad,
+          child: JalaFloatingCircleButton(
+            icon: Icons.my_location,
+            iconColor: const Color(0xFF005B9F),
+            iconSize: 24,
+            onTap: _getCurrentLocation,
           ),
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 84 + bottomPad,
+          child: JalaHomeBottomSheet(
+            greetingName: vm.greetingName,
+            onSearchTap: () {
+              Navigator.of(context).pushNamed('/trip/searching');
+            },
           ),
         ),
       ],
     );
   }
-}
 
-class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({
-    required this.selectedIndex,
-    required this.onTabSelected,
-  });
-
-  final int selectedIndex;
-  final void Function(int) onTabSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      height: 84,
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavButton(
-            icon: Icons.home_rounded,
-            isActive: selectedIndex == 0,
-            onTap: () => onTabSelected(0),
-          ),
-          _NavButton(
-            icon: Icons.receipt_long_rounded,
-            isActive: selectedIndex == 1,
-            onTap: () => onTabSelected(1),
-          ),
-          _NavButton(
-            icon: Icons.person_outline_rounded,
-            isActive: selectedIndex == 2,
-            onTap: () => onTabSelected(2),
-          ),
-        ],
-      ),
-    );
+  Widget _buildTripsTab() {
+    return const TripHistoryScreen();
   }
-}
 
-class _NavButton extends StatelessWidget {
-  const _NavButton({
-    required this.icon,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        width: 56,
-        height: 56,
-        alignment: Alignment.center,
-        child: Icon(
-          icon,
-          size: 28,
-          color: isActive ? colorScheme.secondary : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-        ),
+  Widget _buildProfileTab(
+    BuildContext context,
+    String userName,
+    String userInitials,
+    String userSubtitle,
+  ) {
+    return SafeArea(
+      bottom: false,
+      child: Column(
+        children: [
+          Expanded(
+            child: JalaSidebar(
+              userName: userName,
+              userInitials: userInitials,
+              userSubtitle: userSubtitle,
+              sections: [
+                JalaSidebarSection(
+                  label: 'CUENTA',
+                  options: [
+                    JalaSidebarOption(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Mi perfil',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRoutes.profile),
+                    ),
+                    JalaSidebarOption(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: 'Metodos de pago',
+                      onTap: () {},
+                    ),
+                    JalaSidebarOption(
+                      icon: Icons.location_on_outlined,
+                      label: 'Mis direcciones',
+                      onTap: () {},
+                    ),
+                  ],
+                ),
+                JalaSidebarSection(
+                  label: 'PREFERENCIAS',
+                  options: [
+                    JalaSidebarOption(
+                      icon: Icons.notifications_outlined,
+                      label: 'Notificaciones',
+                      onTap: () {},
+                    ),
+                  ],
+                ),
+                JalaSidebarSection(
+                  label: 'SOPORTE',
+                  options: [
+                    JalaSidebarOption(
+                      icon: Icons.help_outline_rounded,
+                      label: 'Centro de ayuda',
+                      onTap: () {},
+                    ),
+                    JalaSidebarOption(
+                      icon: Icons.description_outlined,
+                      label: 'Terminos y privacidad',
+                      onTap: () {},
+                    ),
+                  ],
+                ),
+              ],
+              onLogout: () => _confirmLogout(context),
+            ),
+          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom + 84),
+        ],
       ),
     );
   }

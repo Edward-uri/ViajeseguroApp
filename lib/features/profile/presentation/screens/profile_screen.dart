@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 
+import '../../../../core/widgets/bubble_loader.dart';
 import '../../../../routes/app_routes.dart';
 import '../../../../shared/domain/entities/user.dart';
-import '../../../auth/domain/repositories/auth_repository.dart';
-import '../../domain/repositories/profile_repository.dart';
+import '../../../../shared/widgets/jala_alert_banner.dart';
 import '../provider/profile_viewmodel.dart';
-
 
 const Map<String, String> _allowedImageMimeByExt = <String, String>{
   'jpg': 'image/jpeg',
@@ -16,28 +15,34 @@ const Map<String, String> _allowedImageMimeByExt = <String, String>{
   'webp': 'image/webp',
 };
 
-
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider<ProfileViewModel>(
-      create: (ctx) => ProfileViewModel(
-        ctx.read<ProfileRepository>(),
-        ctx.read<AuthRepository>(),
-      )..loadProfile(),
-      child: const _ProfileView(),
-    );
-  }
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileView extends StatelessWidget {
-  const _ProfileView();
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(profileViewModelProvider.notifier).loadProfile();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<ProfileViewModel>();
+    return const _ProfileView();
+  }
+}
+
+class _ProfileView extends ConsumerWidget {
+  const _ProfileView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vm = ref.watch(profileViewModelProvider);
     final scheme = Theme.of(context).colorScheme;
 
     if (vm.user == null && vm.errorMessage != null && !vm.isLoading) {
@@ -56,7 +61,7 @@ class _ProfileView extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Recargar',
-            onPressed: vm.isLoading ? null : vm.loadProfile,
+            onPressed: vm.isLoading ? null : () => ref.read(profileViewModelProvider.notifier).loadProfile(),
             icon: const Icon(Icons.refresh),
           ),
         ],
@@ -65,7 +70,7 @@ class _ProfileView extends StatelessWidget {
         child: Builder(
           builder: (context) {
             if (vm.isLoading && vm.user == null) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: BubbleLoader());
             }
             final user = vm.user;
             if (user == null) {
@@ -88,14 +93,14 @@ class _ProfileView extends StatelessWidget {
   }
 }
 
-class _ProfileContent extends StatelessWidget {
+class _ProfileContent extends ConsumerWidget {
   const _ProfileContent({required this.user});
 
   final User user;
 
   @override
-  Widget build(BuildContext context) {
-    final vm = context.watch<ProfileViewModel>();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final vm = ref.watch(profileViewModelProvider);
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
 
@@ -105,14 +110,14 @@ class _ProfileContent extends StatelessWidget {
         Center(
           child: _Avatar(
             url: user.fotoPerfilUrl,
-            initials: _initials(user.nombreUsuario),
+            initials: user.iniciales,
             isUploading: vm.isUploadingPhoto,
           ),
         ),
         const SizedBox(height: 16),
         Center(
           child: Text(
-            '@${user.nombreUsuario}',
+            user.nombreCompleto,
             style: text.headlineSmall?.copyWith(
               fontWeight: FontWeight.w700,
               color: scheme.onSurface,
@@ -145,7 +150,11 @@ class _ProfileContent extends StatelessWidget {
         ),
         if (vm.errorMessage != null) ...[
           const SizedBox(height: 16),
-          _ErrorBanner(message: vm.errorMessage!),
+          JalaAlertBanner(
+            message: vm.errorMessage!,
+            onDismiss: () =>
+                ref.read(profileViewModelProvider.notifier).clearError(),
+          ),
         ],
         const SizedBox(height: 24),
         Text('Acciones',
@@ -154,7 +163,7 @@ class _ProfileContent extends StatelessWidget {
         FilledButton.tonalIcon(
           onPressed: vm.isUploadingPhoto || vm.isDeleting
               ? null
-              : () => _pickAndUploadPhoto(context),
+              : () => _pickAndUploadPhoto(context, ref),
           icon: const Icon(Icons.photo_camera_outlined),
           label: const Text('Cambiar foto de perfil'),
         ),
@@ -163,7 +172,7 @@ class _ProfileContent extends StatelessWidget {
           onPressed: vm.isDeleting
               ? null
               : () async {
-                  await vm.logout();
+                  await ref.read(profileViewModelProvider.notifier).logout();
                   if (!context.mounted) return;
                   Navigator.of(context).pushNamedAndRemoveUntil(
                     AppRoutes.login,
@@ -177,7 +186,7 @@ class _ProfileContent extends StatelessWidget {
         TextButton.icon(
           onPressed: vm.isDeleting
               ? null
-              : () => _confirmDelete(context),
+              : () => _confirmDelete(context, ref),
           icon: Icon(Icons.delete_outline, color: scheme.error),
           label: Text(
             'Eliminar mi cuenta',
@@ -188,18 +197,12 @@ class _ProfileContent extends StatelessWidget {
     );
   }
 
-  String _initials(String username) {
-    if (username.isEmpty) return '?';
-    return username.substring(0, 1).toUpperCase();
-  }
-
   String _formatDate(DateTime date) {
     final d = date.toLocal();
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
   }
 
-
-  Future<void> _pickAndUploadPhoto(BuildContext context) async {
+  Future<void> _pickAndUploadPhoto(BuildContext context, WidgetRef ref) async {
     final source = await _askPhotoSource(context);
     if (source == null || !context.mounted) return;
 
@@ -225,15 +228,16 @@ class _ProfileContent extends StatelessWidget {
     final bytes = await file.readAsBytes();
     if (!context.mounted) return;
 
-    final vm = context.read<ProfileViewModel>();
+    final vm = ref.read(profileViewModelProvider.notifier);
     final ok = await vm.uploadNewPhoto(bytes: bytes, contentType: contentType);
     if (!context.mounted) return;
+    final state = ref.read(profileViewModelProvider);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           ok
               ? 'Foto actualizada'
-              : (vm.errorMessage ?? 'No se pudo actualizar la foto'),
+              : (state.errorMessage ?? 'No se pudo actualizar la foto'),
         ),
         duration: ok ? const Duration(seconds: 3) : const Duration(seconds: 10),
       ),
@@ -265,7 +269,6 @@ class _ProfileContent extends StatelessWidget {
     );
   }
 
-
   String? _resolveContentType(XFile file) {
     final mime = file.mimeType?.toLowerCase();
     if (mime != null && _allowedImageMimeByExt.values.contains(mime)) {
@@ -278,7 +281,7 @@ class _ProfileContent extends StatelessWidget {
     return _allowedImageMimeByExt[ext];
   }
 
-  Future<void> _confirmDelete(BuildContext context) async {
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
     final scheme = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -302,7 +305,7 @@ class _ProfileContent extends StatelessWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    final vm = context.read<ProfileViewModel>();
+    final vm = ref.read(profileViewModelProvider.notifier);
     final ok = await vm.deleteAccount();
     if (ok && context.mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil(
@@ -403,39 +406,6 @@ class _Avatar extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline,
-              size: 18, color: scheme.onErrorContainer),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: text.bodySmall?.copyWith(color: scheme.onErrorContainer),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -1,49 +1,79 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../core/auth/current_user_provider.dart';
 import '../../../../../shared/domain/entities/user.dart';
+import '../../../../profile/di/profile_module.dart';
 import '../../../../profile/domain/repositories/profile_repository.dart';
 
-
-class PassengerHomeViewModel extends ChangeNotifier {
-  PassengerHomeViewModel(this._profileRepo);
+class PassengerHomeViewModel extends StateNotifier<PassengerHomeViewModelState> {
+  PassengerHomeViewModel(this._profileRepo, this._currentUserNotifier)
+      : super(const PassengerHomeViewModelState());
 
   final ProfileRepository _profileRepo;
-
-  int _selectedIndex = 0;
-  User? _user;
-  bool _isLoading = false;
-  String? _errorMessage;
-
-  int get selectedIndex => _selectedIndex;
-  User? get user => _user;
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-
-  String get greetingName {
-    if (_user == null) return 'Pasajero';
-    final nombre = _user!.nombreUsuario;
-    if (nombre.isEmpty) return 'Pasajero';
-    return nombre.split(' ').first;
-  }
+  final CurrentUserNotifier _currentUserNotifier;
 
   Future<void> loadUser() async {
-    if (_isLoading) return;
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+    final cached = _currentUserNotifier.user;
+    if (cached != null) {
+      state = state.copyWith(user: cached, isLoading: false);
+      return;
+    }
+    if (state.isLoading) return;
+    state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      _user = await _profileRepo.getMe();
+      final user = await _profileRepo.getMe();
+      _currentUserNotifier.setUser(user);
+      state = state.copyWith(user: user, isLoading: false);
     } catch (_) {
-      _errorMessage = 'No se pudo cargar el perfil';
-    } finally {
-      _isLoading = false;
-      notifyListeners();
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: 'No se pudo cargar el perfil',
+      );
     }
   }
 
   void selectTab(int index) {
-    if (_selectedIndex == index) return;
-    _selectedIndex = index;
-    notifyListeners();
+    if (state.selectedIndex == index) return;
+    state = state.copyWith(selectedIndex: index);
   }
 }
+
+class PassengerHomeViewModelState {
+  const PassengerHomeViewModelState({
+    this.selectedIndex = 0,
+    this.user,
+    this.isLoading = false,
+    this.errorMessage,
+  });
+
+  final int selectedIndex;
+  final User? user;
+  final bool isLoading;
+  final String? errorMessage;
+
+  String get greetingName {
+    if (user == null) return 'Pasajero';
+    return user!.nombreParaMostrar;
+  }
+
+  PassengerHomeViewModelState copyWith({
+    int? selectedIndex,
+    User? user,
+    bool? isLoading,
+    String? errorMessage,
+  }) {
+    return PassengerHomeViewModelState(
+      selectedIndex: selectedIndex ?? this.selectedIndex,
+      user: user ?? this.user,
+      isLoading: isLoading ?? this.isLoading,
+      errorMessage: errorMessage ?? this.errorMessage,
+    );
+  }
+}
+
+final passengerHomeViewModelProvider = StateNotifierProvider<PassengerHomeViewModel, PassengerHomeViewModelState>((ref) {
+  return PassengerHomeViewModel(
+    ref.watch(profileRepositoryProvider),
+    ref.watch(currentUserProvider.notifier),
+  );
+});
