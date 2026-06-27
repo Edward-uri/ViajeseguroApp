@@ -42,6 +42,10 @@ dependencies:
   # Inyeccion de dependencias automatica + gestion de estado MVVM.
   flutter_riverpod: ^2.6.1
 
+  # Igualdad por valor en estados/entidades -> permite que Riverpod deduplique
+  # rebuilds (oldState == newState) y que .select() corte reconstrucciones.
+  equatable: ^2.0.7
+
   # Cliente HTTP (obligatorio cátedra). Una sola instancia compartida via Provider.
   http: ^1.2.2
 

@@ -7,7 +7,6 @@ import '../../../../../routes/app_routes.dart';
 import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/theme.dart';
 import '../../../trip-searching/di/trip_searching_module.dart';
-import '../../../trip-searching/domain/repositories/trip_search_repository.dart';
 import '../../domain/entities/trip.dart';
 import '../provider/trip_in_progress_viewmodel.dart';
 
@@ -94,8 +93,6 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vm = ref.watch(tripInProgressViewModelProvider);
-    final trip = vm.trip ?? widget.trip;
     final topPad = MediaQuery.of(context).padding.top;
     final bottomPad = MediaQuery.of(context).padding.bottom;
 
@@ -118,6 +115,8 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     return Scaffold(
       body: Stack(
         children: [
+          // Mapa estatico: no depende del estado, asi que los ticks de
+          // posicion del conductor (sub-segundo) ya no lo reconstruyen.
           JalaMapView(
             onMapCreated: _onMapCreated,
             showLocationMarker: false,
@@ -138,29 +137,52 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
               onTap: () {},
             ),
           ),
-          if (trip.status == TripStatus.aceptado ||
-              trip.status == TripStatus.enCurso)
-            Positioned(
-              top: topPad + 80,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: SvgPicture.asset(
-                  'lib/shared/icons/MototaxiMapa.svg',
-                  width: 48,
-                  height: 48,
+          // Marcador: solo se reconstruye cuando cambia el status del viaje.
+          Consumer(
+            builder: (context, ref, _) {
+              final status = ref.watch(
+                tripInProgressViewModelProvider
+                    .select((s) => (s.trip ?? widget.trip).status),
+              );
+              if (status != TripStatus.aceptado &&
+                  status != TripStatus.enCurso) {
+                return const SizedBox.shrink();
+              }
+              return Positioned(
+                top: topPad + 80,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: SvgPicture.asset(
+                    'lib/shared/icons/MototaxiMapa.svg',
+                    width: 48,
+                    height: 48,
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
+          // Panel: se reconstruye con el viaje (poll de 5s) o isLoading,
+          // NO en cada tick de driverPosition (que no se renderiza).
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _TripBottomPanel(
-              trip: trip,
-              vm: vm,
-              bottomPad: bottomPad,
-              onCancel: () => _showCancelDialog(context),
+            child: Consumer(
+              builder: (context, ref, _) {
+                final trip = ref.watch(tripInProgressViewModelProvider
+                        .select((s) => s.trip)) ??
+                    widget.trip;
+                final isLoading = ref.watch(
+                  tripInProgressViewModelProvider.select((s) => s.isLoading),
+                );
+                return _TripBottomPanel(
+                  trip: trip,
+                  isLoading: isLoading,
+                  bottomPad: bottomPad,
+                  onCancel: () => _showCancelDialog(context),
+                );
+              },
             ),
           ),
         ],
@@ -198,13 +220,15 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
 class _TripBottomPanel extends StatelessWidget {
   const _TripBottomPanel({
     required this.trip,
-    required this.vm,
+    required this.isLoading,
     required this.bottomPad,
     required this.onCancel,
   });
 
+  static final _whitespace = RegExp(r'\s+');
+
   final Trip trip;
-  final TripInProgressViewModelState vm;
+  final bool isLoading;
   final double bottomPad;
   final VoidCallback onCancel;
 
@@ -255,7 +279,7 @@ class _TripBottomPanel extends StatelessWidget {
 
   String get _driverInitials {
     final name = trip.driverName ?? '??';
-    final parts = name.split(RegExp(r'\s+'));
+    final parts = name.split(_whitespace);
     if (parts.length >= 2) {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
@@ -342,8 +366,8 @@ class _TripBottomPanel extends StatelessWidget {
             const SizedBox(height: 16),
             Center(
               child: TextButton(
-                onPressed: vm.isLoading ? null : onCancel,
-                child: vm.isLoading
+                onPressed: isLoading ? null : onCancel,
+                child: isLoading
                     ? const SizedBox(
                         width: 20,
                         height: 20,

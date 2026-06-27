@@ -157,7 +157,6 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final vm = ref.watch(tripSearchingViewModelProvider);
     final notifier = ref.read(tripSearchingViewModelProvider.notifier);
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
@@ -186,13 +185,22 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
       extendBody: true,
       body: Stack(
         children: [
-          JalaMapView(
-            onMapCreated: _onMapCreated,
-            showLocationMarker: false,
-            showCurrentLocationPin: true,
-            showPinMarker: vm.isPickingOnMap,
-            onCameraChanged: _onCameraChanged,
-            onMapIdle: _onMapIdle,
+          // Mapa aislado: solo se reconstruye cuando cambia isPickingOnMap,
+          // no en cada tecla del buscador ni en cada cambio del panel inferior.
+          Consumer(
+            builder: (context, ref, _) {
+              final isPickingOnMap = ref.watch(
+                tripSearchingViewModelProvider.select((s) => s.isPickingOnMap),
+              );
+              return JalaMapView(
+                onMapCreated: _onMapCreated,
+                showLocationMarker: false,
+                showCurrentLocationPin: true,
+                showPinMarker: isPickingOnMap,
+                onCameraChanged: _onCameraChanged,
+                onMapIdle: _onMapIdle,
+              );
+            },
           ),
           Positioned(
             top: MediaQuery.of(context).padding.top + 16,
@@ -201,45 +209,62 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
               onTap: () => Navigator.of(context).pop(),
             ),
           ),
+          // Boton flotante: su posicion depende de la altura del panel.
+          // .select sobre un double -> solo rebuild cuando esa altura cambia,
+          // no en cada keystroke ni en cada tick de camara.
           if (_currentPosition != null)
-            Positioned(
-              right: 24,
-              bottom: _bottomPanelHeight(vm) + bottomPadding + 16,
-              child: JalaFloatingCircleButton(
-                icon: Icons.my_location,
-                iconColor: const Color(0xFF005B9F),
-                iconSize: 24,
-                onTap: _getCurrentLocation,
-              ),
+            Consumer(
+              builder: (context, ref, _) {
+                final panelHeight = ref.watch(
+                  tripSearchingViewModelProvider.select(_bottomPanelHeight),
+                );
+                return Positioned(
+                  right: 24,
+                  bottom: panelHeight + bottomPadding + 16,
+                  child: JalaFloatingCircleButton(
+                    icon: Icons.my_location,
+                    iconColor: const Color(0xFF005B9F),
+                    iconSize: 24,
+                    onTap: _getCurrentLocation,
+                  ),
+                );
+              },
             ),
+          // Panel inferior: consume el estado que realmente renderiza, pero
+          // aislado del mapa (que ya no se reconstruye junto con el).
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _BottomPanel(
-              vm: vm,
-              notifier: notifier,
-              originController: _originController,
-              destinationController: _destinationController,
-              originFocusNode: _originFocusNode,
-              destinationFocusNode: _destinationFocusNode,
-              bottomPadding: bottomPadding,
-              onConfirmTrip: () => _confirmTrip(context, notifier),
-              onRequestFare: () => _requestFare(notifier),
-              onUseCurrentLocation: () {
-                if (_currentPosition == null) return;
-                final location = TripLocation(
-                  address: 'Mi ubicacion actual',
-                  latitude: _currentPosition!.latitude,
-                  longitude: _currentPosition!.longitude,
-                  placeName: 'Mi ubicacion',
+            child: Consumer(
+              builder: (context, ref, _) {
+                final vm = ref.watch(tripSearchingViewModelProvider);
+                return _BottomPanel(
+                  vm: vm,
+                  notifier: notifier,
+                  originController: _originController,
+                  destinationController: _destinationController,
+                  originFocusNode: _originFocusNode,
+                  destinationFocusNode: _destinationFocusNode,
+                  bottomPadding: bottomPadding,
+                  onConfirmTrip: () => _confirmTrip(context, notifier),
+                  onRequestFare: () => _requestFare(notifier),
+                  onUseCurrentLocation: () {
+                    if (_currentPosition == null) return;
+                    final location = TripLocation(
+                      address: 'Mi ubicacion actual',
+                      latitude: _currentPosition!.latitude,
+                      longitude: _currentPosition!.longitude,
+                      placeName: 'Mi ubicacion',
+                    );
+                    if (vm.activeInput == LocationInputMode.origin) {
+                      notifier.selectOrigin(location);
+                      _destinationFocusNode.requestFocus();
+                    } else {
+                      notifier.selectDestination(location);
+                    }
+                  },
                 );
-                if (vm.activeInput == LocationInputMode.origin) {
-                  notifier.selectOrigin(location);
-                  _destinationFocusNode.requestFocus();
-                } else {
-                  notifier.selectDestination(location);
-                }
               },
             ),
           ),

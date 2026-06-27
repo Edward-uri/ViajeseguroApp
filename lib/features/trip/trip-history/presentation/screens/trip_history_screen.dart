@@ -192,6 +192,10 @@ class _TripHistoryCard extends StatelessWidget {
 
   final TripHistoryItem item;
 
+  // static const: se asigna una sola vez, no se realoja por cada tarjeta
+  // construida durante el scroll.
+  static const _meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+
   String _formatFecha(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
@@ -202,8 +206,7 @@ class _TripHistoryCard extends StatelessWidget {
     if (yesterday.day == date.day && yesterday.month == date.month) {
       return 'Ayer · ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     }
-    final meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-    return '${date.day} ${meses[date.month - 1]} · ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return '${date.day} ${_meses[date.month - 1]} · ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
 
   @override

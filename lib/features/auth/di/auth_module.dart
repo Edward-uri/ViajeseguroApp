@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/di/core_module.dart';
@@ -41,6 +42,24 @@ final mockLocationDetectorProvider = Provider<MockLocationDetector>((ref) {
   return MockLocationDetectorImpl();
 });
 
+// ⚠️ TEMPORAL — Bypass de la deteccion de USB debugging para poder perfilar la
+// app con `flutter run --profile` (requiere el dispositivo conectado por USB con
+// depuracion activa; de lo contrario cae en la pantalla de bloqueo de seguridad).
+// REACTIVAR (poner en false) antes de entregar / hacer release.
+const bool kBypassUsbDebugCheck = true;
+
 final usbDebugDetectorProvider = Provider<UsbDebugDetector>((ref) {
+  // Blindaje: el bypass SOLO surte efecto fuera de release. En un build de
+  // produccion la deteccion de USB debugging sigue activa pase lo que pase.
+  if (kBypassUsbDebugCheck && !kReleaseMode) {
+    return _DisabledUsbDebugDetector();
+  }
   return UsbDebugDetectorImpl();
 });
+
+/// Detector no-op: reporta que NO hay USB debugging. Se usa solo cuando
+/// [kBypassUsbDebugCheck] esta activo en builds no-release.
+class _DisabledUsbDebugDetector implements UsbDebugDetector {
+  @override
+  Future<bool> isUsbDebuggingActive() async => false;
+}

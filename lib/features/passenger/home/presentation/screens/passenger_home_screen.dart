@@ -111,12 +111,20 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          if (vm.selectedIndex == 0)
-            _buildHomeTab(vm, bottomPad, context)
-          else if (vm.selectedIndex == 1)
-            _buildTripsTab()
-          else
-            _buildProfileTab(context, userName, userInitials, userSubtitle),
+          // IndexedStack mantiene los 3 tabs montados: cambiar de tab solo
+          // alterna cual se pinta. El MapWidget nativo de Mapbox ya NO se
+          // destruye/recrea al ir a "Mis viajes" ni al volver a Home, y el
+          // historial se construye una sola vez (sin jank de entrada).
+          Positioned.fill(
+            child: IndexedStack(
+              index: vm.selectedIndex,
+              children: [
+                _buildHomeTab(vm, bottomPad, context),
+                _buildTripsTab(),
+                _buildProfileTab(context, userName, userInitials, userSubtitle),
+              ],
+            ),
+          ),
           Positioned(
             left: 0,
             right: 0,

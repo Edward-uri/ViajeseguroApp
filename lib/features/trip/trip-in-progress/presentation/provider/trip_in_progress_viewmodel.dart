@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -98,7 +99,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
   }
 }
 
-class TripInProgressViewModelState {
+class TripInProgressViewModelState extends Equatable {
   const TripInProgressViewModelState({
     this.trip,
     this.isLoading = false,
@@ -129,6 +130,9 @@ class TripInProgressViewModelState {
       driverPosition: driverPosition ?? this.driverPosition,
     );
   }
+
+  @override
+  List<Object?> get props => [trip, isLoading, errorMessage, driverPosition];
 }
 
 final tripInProgressViewModelProvider =

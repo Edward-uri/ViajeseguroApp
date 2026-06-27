@@ -1,3 +1,4 @@
+import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/auth/current_user_provider.dart';
@@ -38,7 +39,7 @@ class PassengerHomeViewModel extends StateNotifier<PassengerHomeViewModelState> 
   }
 }
 
-class PassengerHomeViewModelState {
+class PassengerHomeViewModelState extends Equatable {
   const PassengerHomeViewModelState({
     this.selectedIndex = 0,
     this.user,
@@ -69,6 +70,9 @@ class PassengerHomeViewModelState {
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
+
+  @override
+  List<Object?> get props => [selectedIndex, user, isLoading, errorMessage];
 }
 
 final passengerHomeViewModelProvider = StateNotifierProvider<PassengerHomeViewModel, PassengerHomeViewModelState>((ref) {

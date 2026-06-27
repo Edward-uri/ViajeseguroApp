@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
@@ -254,7 +255,7 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
   }
 }
 
-class TripSearchingViewModelState {
+class TripSearchingViewModelState extends Equatable {
   const TripSearchingViewModelState({
     this.step = TripSearchingStep.selectingOrigin,
     this.activeInput = LocationInputMode.origin,
@@ -329,6 +330,25 @@ class TripSearchingViewModelState {
       pendingMapAddress: pendingMapAddress ?? this.pendingMapAddress,
     );
   }
+
+  @override
+  List<Object?> get props => [
+        step,
+        activeInput,
+        origin,
+        destination,
+        trip,
+        searchQuery,
+        searchResults,
+        isSearching,
+        searchError,
+        isLoading,
+        errorMessage,
+        isPickingOnMap,
+        pendingMapLat,
+        pendingMapLng,
+        pendingMapAddress,
+      ];
 }
 
 final tripSearchingViewModelProvider =

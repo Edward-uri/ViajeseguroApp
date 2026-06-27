@@ -1,3 +1,4 @@
+import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/http/api_exception.dart';
@@ -16,7 +17,11 @@ class TripHistoryViewModel extends StateNotifier<TripHistoryViewModelState> {
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final items = await _repository.getTripHistory();
-      state = state.copyWith(items: items, isLoading: false);
+      state = state.copyWith(
+        items: items,
+        isLoading: false,
+        totalEsteMes: _contarEsteMes(items),
+      );
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.message);
     } catch (_) {
@@ -31,38 +36,48 @@ class TripHistoryViewModel extends StateNotifier<TripHistoryViewModelState> {
     if (state.errorMessage == null) return;
     state = state.copyWith(errorMessage: null);
   }
-}
 
-class TripHistoryViewModelState {
-  const TripHistoryViewModelState({
-    this.items = const [],
-    this.isLoading = false,
-    this.errorMessage,
-  });
-
-  final List<TripHistoryItem> items;
-  final bool isLoading;
-  final String? errorMessage;
-
-  int get totalEsteMes {
+  static int _contarEsteMes(List<TripHistoryItem> items) {
     final now = DateTime.now();
     return items
         .where((item) =>
             item.fecha.month == now.month && item.fecha.year == now.year)
         .length;
   }
+}
+
+class TripHistoryViewModelState extends Equatable {
+  const TripHistoryViewModelState({
+    this.items = const [],
+    this.isLoading = false,
+    this.errorMessage,
+    this.totalEsteMes = 0,
+  });
+
+  final List<TripHistoryItem> items;
+  final bool isLoading;
+  final String? errorMessage;
+
+  // Precalculado al cargar (antes era un getter que filtraba toda la lista
+  // y llamaba DateTime.now() en cada build).
+  final int totalEsteMes;
 
   TripHistoryViewModelState copyWith({
     List<TripHistoryItem>? items,
     bool? isLoading,
     String? errorMessage,
+    int? totalEsteMes,
   }) {
     return TripHistoryViewModelState(
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
+      totalEsteMes: totalEsteMes ?? this.totalEsteMes,
     );
   }
+
+  @override
+  List<Object?> get props => [items, isLoading, errorMessage, totalEsteMes];
 }
 
 final tripHistoryViewModelProvider =
