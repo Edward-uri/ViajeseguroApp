@@ -24,4 +24,6 @@ abstract class TripRepository {
   Future<Trip?> getActiveTrip();
 
   Future<void> cancelTrip(String tripId, {String? motivo});
+
+  Future<void> rateTrip(String tripId, {required int calificacion, String? comentario});
 }

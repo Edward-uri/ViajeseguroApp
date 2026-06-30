@@ -71,4 +71,9 @@ class TripRepositoryImpl implements TripRepository {
   Future<void> cancelTrip(String tripId, {String? motivo}) async {
     await _tripApi.cancelTrip(tripId, motivo: motivo);
   }
+
+  @override
+  Future<void> rateTrip(String tripId, {required int calificacion, String? comentario}) async {
+    await _tripApi.rateTrip(tripId, calificacion: calificacion, comentario: comentario);
+  }
 }

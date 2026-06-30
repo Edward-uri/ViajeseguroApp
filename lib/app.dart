@@ -9,6 +9,7 @@ import 'features/passenger/home/presentation/screens/passenger_home_screen.dart'
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'features/trip/trip-in-progress/domain/entities/trip.dart';
+import 'features/trip/trip-in-progress/presentation/screens/trip_evaluation_screen.dart';
 import 'features/trip/trip-in-progress/presentation/screens/trip_in_progress_screen.dart';
 import 'features/trip/trip-searching/presentation/screens/trip_searching_screen.dart';
 import 'routes/app_routes.dart';
@@ -52,6 +53,9 @@ class JalaApp extends StatelessWidget {
           case AppRoutes.tripInProgress:
             final trip = settings.arguments as Trip;
             return PageTransitions.slideUp(TripInProgressScreen(trip: trip));
+          case AppRoutes.tripEvaluation:
+            final trip = settings.arguments as Trip;
+            return PageTransitions.slideUp(TripEvaluationScreen(trip: trip));
           default:
             return PageTransitions.fadeThrough(const LoginScreen());
         }

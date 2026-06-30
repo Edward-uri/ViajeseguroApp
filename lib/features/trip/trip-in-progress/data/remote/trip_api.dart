@@ -86,4 +86,18 @@ class TripApi {
         body: motivo != null ? {'motivo': motivo} : null,
         auth: true,
       );
+
+  Future<void> rateTrip(
+    String tripId, {
+    required int calificacion,
+    String? comentario,
+  }) =>
+      _api.post(
+        '${ApiRoutes.viajes}/$tripId/evaluacion',
+        body: <String, dynamic>{
+          'calificacion': calificacion,
+          if (comentario != null && comentario.isNotEmpty) 'comentario': comentario,
+        },
+        auth: true,
+      );
 }

@@ -40,6 +40,8 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Asegura el socket conectado durante el viaje (idempotente).
+      ref.read(socketServiceProvider).connect();
       ref.read(tripInProgressViewModelProvider.notifier).setTrip(widget.trip);
     });
   }
@@ -247,16 +249,19 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
           _updateDriverMarker(next.driverPosition!);
         }
 
-        // Redirigir al home cuando el viaje termina
+        // Al completar: pasar a calificar al conductor. Al cancelar: ir al home.
         final status = next.trip?.status;
-        if (status == TripStatus.completado ||
-            status == TripStatus.cancelado) {
-          if (mounted) {
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              AppRoutes.passengerHome,
-              (route) => false,
-            );
-          }
+        if (status == TripStatus.completado && mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            AppRoutes.tripEvaluation,
+            (route) => false,
+            arguments: next.trip,
+          );
+        } else if (status == TripStatus.cancelado && mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            AppRoutes.passengerHome,
+            (route) => false,
+          );
         }
       },
     );

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../../core/websocket/socket_service.dart';
@@ -28,6 +29,7 @@ class SocketTripTrackingService implements TripTrackingService {
       if (event.idViaje != _trackingTripId) return;
       if (event.lat == null || event.lng == null) return;
 
+      debugPrint('[Tracking] ubicación del conductor: ${event.lat},${event.lng}');
       _controller?.add(DriverPosition(
         latitude: event.lat!,
         longitude: event.lng!,
@@ -63,6 +65,7 @@ class SocketTripTrackingService implements TripTrackingService {
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 10),
       );
+      debugPrint('[Tracking] comparto mi ubicación: ${pos.latitude},${pos.longitude}');
       _socketService.emitPassengerLocation(
         idViaje: idViaje,
         lat: pos.latitude,
