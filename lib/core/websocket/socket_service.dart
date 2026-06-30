@@ -143,11 +143,25 @@ class SocketService {
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(const Duration(seconds: 2), () async {
-      final refreshed = await _onTokenExpired!();
+      final refreshed = await _onTokenExpired();
       if (refreshed) {
         disconnect();
         connect();
       }
+    });
+  }
+
+  /// Comparte la ubicación del pasajero con el conductor del viaje activo.
+  /// El servidor la reenvía como `viaje:ubicacion_pasajero` al conductor.
+  void emitPassengerLocation({
+    required int idViaje,
+    required double lat,
+    required double lng,
+  }) {
+    _socket?.emit('pasajero:ubicacion', {
+      'idViaje': idViaje,
+      'lat': lat,
+      'lng': lng,
     });
   }
 

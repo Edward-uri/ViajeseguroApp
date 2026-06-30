@@ -6,8 +6,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../../core/di/core_module.dart';
+import '../../../../../core/http/api_client.dart';
 import '../../../../../routes/app_routes.dart';
 import '../../../../../shared/utils/svg_to_mapbox.dart';
+import '../../../../../shared/widgets/auth_image_provider.dart';
 import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/jala_theme.dart';
 import '../../../trip-searching/di/trip_searching_module.dart';
@@ -102,6 +105,13 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   void _drawRoute() async {
     if (_routeDrawn) return;
     final trip = widget.trip;
+
+    // Respaldo (línea recta) si OSRM no responde: la ruta y los pines SIEMPRE
+    // deben verse mientras haya un viaje activo.
+    var coordinates = <Position>[
+      Position(trip.origin.longitude, trip.origin.latitude),
+      Position(trip.destination.longitude, trip.destination.latitude),
+    ];
     try {
       final repo = ref.read(tripSearchRepositoryProvider);
       final routeCoords = await repo.getRoute(
@@ -110,28 +120,27 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
         destinationLat: trip.destination.latitude,
         destinationLng: trip.destination.longitude,
       );
+      if (routeCoords.isNotEmpty) {
+        coordinates = routeCoords.map((c) => Position(c[0], c[1])).toList();
+      }
+    } catch (e) {
+      debugPrint('[TripInProgress] OSRM falló, uso línea recta: $e');
+    }
 
-      final coordinates = routeCoords.isNotEmpty
-          ? routeCoords.map((c) => Position(c[0], c[1])).toList()
-          : [
-              Position(trip.origin.longitude, trip.origin.latitude),
-              Position(trip.destination.longitude, trip.destination.latitude),
-            ];
-
-      final polylineOptions = PolylineAnnotationOptions(
+    try {
+      _polylineManager?.create(PolylineAnnotationOptions(
         geometry: LineString(coordinates: coordinates),
         lineColor: JalaBrand.amber.toARGB32(),
         lineWidth: 5.0,
         lineOpacity: 0.9,
-      );
-      _polylineManager?.create(polylineOptions);
+      ));
       _routeDrawn = true;
-
-      // Dibujar pines de origen y destino
-      _drawOriginDestinationPins();
     } catch (e) {
-      debugPrint('[TripInProgress] No se pudo dibujar ruta: $e');
+      debugPrint('[TripInProgress] No se pudo dibujar la ruta: $e');
     }
+
+    // Los pines de origen/destino se dibujan siempre, haya o no ruta de OSRM.
+    _drawOriginDestinationPins();
   }
 
   void _drawOriginDestinationPins() {
@@ -315,6 +324,7 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
                   bottomPad: bottomPad,
                   onCancel: () => _showCancelDialog(context),
                   onCallDriver: _callDriver,
+                  apiClient: ref.read(apiClientProvider),
                 );
               },
             ),
@@ -366,6 +376,7 @@ class _TripBottomPanel extends StatefulWidget {
     required this.bottomPad,
     required this.onCancel,
     required this.onCallDriver,
+    required this.apiClient,
   });
 
   final Trip trip;
@@ -373,6 +384,7 @@ class _TripBottomPanel extends StatefulWidget {
   final double bottomPad;
   final VoidCallback onCancel;
   final void Function(String phone) onCallDriver;
+  final ApiClient apiClient;
 
   @override
   State<_TripBottomPanel> createState() => _TripBottomPanelState();
@@ -646,9 +658,13 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
                         _DriverCard(
                           initials: _driverInitials,
                           name: trip.driverName ?? 'Conductor',
-                          rating: '4.9',
-                          vehicleInfo: trip.vehicleInfo ?? 'Mototaxi',
-                          plate: trip.vehicleInfo ?? 'Sin placa',
+                          rating: trip.driverRating?.toStringAsFixed(1),
+                          vehicleInfo: trip.vehicleInfo?.isNotEmpty == true
+                              ? trip.vehicleInfo!
+                              : 'Mototaxi',
+                          plate: trip.vehiclePlaca ?? 'Sin placa',
+                          idConductor: trip.idConductor,
+                          apiClient: widget.apiClient,
                           phone: trip.driverPhone,
                         ),
                         const SizedBox(height: 16),
@@ -796,14 +812,18 @@ class _DriverCard extends StatelessWidget {
     required this.rating,
     required this.vehicleInfo,
     required this.plate,
+    required this.apiClient,
+    this.idConductor,
     this.phone,
   });
 
   final String initials;
   final String name;
-  final String rating;
+  final String? rating;
   final String vehicleInfo;
   final String plate;
+  final ApiClient apiClient;
+  final int? idConductor;
   final String? phone;
 
   @override
@@ -816,24 +836,7 @@ class _DriverCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: const BoxDecoration(
-              color: JalaBrand.amber,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initials,
-              style: const TextStyle(
-                fontFamily: 'Plus Jakarta Sans',
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-          ),
+          _avatar(context),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -851,15 +854,31 @@ class _DriverCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.star_rounded, size: 14, color: JalaBrand.amber),
-                    const SizedBox(width: 4),
-                    Text(
-                      vehicleInfo,
-                      style: TextStyle(
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: context.brand.greyDark,
+                    if (rating != null) ...[
+                      const Icon(Icons.star_rounded, size: 14, color: JalaBrand.amber),
+                      const SizedBox(width: 4),
+                      Text(
+                        rating!,
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: context.colors.onSurface,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Flexible(
+                      child: Text(
+                        vehicleInfo,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
+                          color: context.brand.greyDark,
+                        ),
                       ),
                     ),
                   ],
@@ -902,6 +921,35 @@ class _DriverCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _avatar(BuildContext context) {
+    final fallback = Text(
+      initials,
+      style: const TextStyle(
+        fontFamily: 'Plus Jakarta Sans',
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
+    );
+    return ClipOval(
+      child: Container(
+        width: 52,
+        height: 52,
+        color: JalaBrand.amber,
+        alignment: Alignment.center,
+        child: idConductor == null
+            ? fallback
+            : Image(
+                image: AuthImageProvider(userId: idConductor!, apiClient: apiClient),
+                width: 52,
+                height: 52,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => fallback,
+              ),
       ),
     );
   }

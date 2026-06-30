@@ -39,6 +39,9 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     // Tracking de ubicación del conductor
     _startTracking(trip.id);
 
+    // Comparte mi ubicación con el conductor (para que me vea acercarme).
+    _trackingService.startSharingLocation(trip.id);
+
     // Polling como fallback (cada 10s, no 5s — el socket es primario)
     _startPolling(trip.id);
   }
@@ -146,6 +149,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
 
   void _stopTracking() {
     _trackingService.stopTracking();
+    _trackingService.stopSharingLocation();
     _positionSubscription?.cancel();
     _positionSubscription = null;
   }

@@ -26,7 +26,9 @@ class Trip {
     this.numPasajeros = 1,
     this.driverName,
     this.driverPhone,
+    this.driverRating,
     this.vehicleInfo,
+    this.vehiclePlaca,
     this.fechaSolicitud,
     this.fechaAceptacion,
     this.fechaInicio,
@@ -51,7 +53,9 @@ class Trip {
   final int numPasajeros;
   final String? driverName;
   final String? driverPhone;
+  final double? driverRating;
   final String? vehicleInfo;
+  final String? vehiclePlaca;
   final DateTime? fechaSolicitud;
   final DateTime? fechaAceptacion;
   final DateTime? fechaInicio;
@@ -70,11 +74,15 @@ class Trip {
     final conductor = json['conductor'] as Map<String, dynamic>?;
     final driverName = conductor?['nombre'] as String? ?? json['driverName'] as String?;
     final driverPhone = conductor?['telefono'] as String? ?? json['driverPhone'] as String?;
+    final driverRating = (conductor?['calificacion'] as num?)?.toDouble();
 
-    // Vehiculo: puede venir anidado en "vehiculo" o en campo plano
+    // Vehiculo (el backend devuelve modelo/color/anio/placa; no hay "marca").
     final vehiculo = json['vehiculo'] as Map<String, dynamic>?;
+    final vehiclePlaca = vehiculo?['placa'] as String?;
     final vehicleInfo = vehiculo != null
-        ? '${vehiculo['marca'] ?? ''} ${vehiculo['modelo'] ?? ''} ${vehiculo['placa'] ?? ''}'.trim()
+        ? [vehiculo['modelo'], vehiculo['color']]
+            .where((v) => v != null && v.toString().trim().isNotEmpty)
+            .join(' · ')
         : json['vehicleInfo'] as String?;
 
     return Trip(
@@ -108,7 +116,9 @@ class Trip {
       numPasajeros: (json['numPasajeros'] as num?)?.toInt() ?? 1,
       driverName: driverName,
       driverPhone: driverPhone,
+      driverRating: driverRating,
       vehicleInfo: vehicleInfo,
+      vehiclePlaca: vehiclePlaca,
       fechaSolicitud: _parseDate(json['fechaSolicitud']),
       fechaAceptacion: _parseDate(json['fechaAceptacion']),
       fechaInicio: _parseDate(json['fechaInicio']),
@@ -154,7 +164,9 @@ class Trip {
     int? numPasajeros,
     String? driverName,
     String? driverPhone,
+    double? driverRating,
     String? vehicleInfo,
+    String? vehiclePlaca,
     DateTime? fechaAceptacion,
     DateTime? fechaInicio,
     DateTime? fechaFin,
@@ -178,7 +190,9 @@ class Trip {
       numPasajeros: numPasajeros ?? this.numPasajeros,
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
+      driverRating: driverRating ?? this.driverRating,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
+      vehiclePlaca: vehiclePlaca ?? this.vehiclePlaca,
       fechaSolicitud: fechaSolicitud,
       fechaAceptacion: fechaAceptacion ?? this.fechaAceptacion,
       fechaInicio: fechaInicio ?? this.fechaInicio,

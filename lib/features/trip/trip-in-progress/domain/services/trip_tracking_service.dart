@@ -1,6 +1,11 @@
 abstract class TripTrackingService {
+  /// Escucha la ubicación del conductor para este viaje.
   Stream<DriverPosition> startTracking(String tripId);
   void stopTracking();
+
+  /// Empieza a compartir la ubicación del pasajero con el conductor (cada pocos segundos).
+  void startSharingLocation(String tripId);
+  void stopSharingLocation();
 }
 
 class DriverPosition {

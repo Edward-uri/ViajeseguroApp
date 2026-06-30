@@ -16,4 +16,10 @@ class StubTripTrackingService implements TripTrackingService {
     _controller?.close();
     _controller = null;
   }
+
+  @override
+  void startSharingLocation(String tripId) {}
+
+  @override
+  void stopSharingLocation() {}
 }

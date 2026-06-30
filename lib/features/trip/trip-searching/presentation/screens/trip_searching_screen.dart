@@ -157,6 +157,13 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
 
   void _drawRoute(TripLocation origin, TripLocation destination) async {
     _polylineManager?.deleteAll();
+
+    // Respaldo (línea recta) si OSRM no responde: la ruta y los pines deben
+    // verse siempre mientras se confirma el viaje.
+    var coordinates = <Position>[
+      Position(origin.longitude, origin.latitude),
+      Position(destination.longitude, destination.latitude),
+    ];
     try {
       final repo = ref.read(tripSearchRepositoryProvider);
       final routeCoords = await repo.getRoute(
@@ -165,23 +172,22 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
         destinationLat: destination.latitude,
         destinationLng: destination.longitude,
       );
+      if (routeCoords.isNotEmpty) {
+        coordinates = routeCoords.map((c) => Position(c[0], c[1])).toList();
+      }
+    } catch (e) {
+      debugPrint('[TripSearching] OSRM falló, uso línea recta: $e');
+    }
 
-      final coordinates = routeCoords.isNotEmpty
-          ? routeCoords.map((c) => Position(c[0], c[1])).toList()
-          : [
-              Position(origin.longitude, origin.latitude),
-              Position(destination.longitude, destination.latitude),
-            ];
-
-      final polylineOptions = PolylineAnnotationOptions(
+    try {
+      _polylineManager?.create(PolylineAnnotationOptions(
         geometry: LineString(coordinates: coordinates),
         lineColor: JalaBrand.amber.toARGB32(),
         lineWidth: 5.0,
         lineOpacity: 0.9,
-      );
-      _polylineManager?.create(polylineOptions);
+      ));
     } catch (e) {
-      debugPrint('[TripSearching] No se pudo dibujar ruta: $e');
+      debugPrint('[TripSearching] No se pudo dibujar la ruta: $e');
     }
 
     // Dibujar pines de origen y destino en el mapa
