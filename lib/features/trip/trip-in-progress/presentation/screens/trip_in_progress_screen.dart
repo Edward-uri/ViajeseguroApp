@@ -31,7 +31,8 @@ class TripInProgressScreen extends ConsumerStatefulWidget {
 class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   MapboxMap? _mapboxMap;
   PolylineAnnotationManager? _polylineManager;
-  PointAnnotationManager? _driverMarkerManager;
+  CircleAnnotationManager? _driverCircleManager;
+  CircleAnnotation? _driverCircle;
   PointAnnotationManager? _pinMarkerManager;
   bool _routeDrawn = false;
   bool _pinImagesLoaded = false;
@@ -55,10 +56,10 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
       debugPrint('[TripInProgress] PolylineAnnotation no disponible: $e');
     }
     try {
-      _driverMarkerManager =
-          await mapboxMap.annotations.createPointAnnotationManager();
+      _driverCircleManager =
+          await mapboxMap.annotations.createCircleAnnotationManager();
     } catch (e) {
-      debugPrint('[TripInProgress] PointAnnotation no disponible: $e');
+      debugPrint('[TripInProgress] CircleAnnotation no disponible: $e');
     }
     try {
       _pinMarkerManager =
@@ -72,6 +73,11 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
 
     _drawRoute();
     _fitRoute();
+
+    // Si ya recibimos una posición del conductor antes de que el mapa estuviera
+    // listo, dibújala de inmediato (no esperar al siguiente tick de 5 s).
+    final pos = ref.read(tripInProgressViewModelProvider).driverPosition;
+    if (pos != null) _updateDriverMarker(pos);
   }
 
   Future<void> _loadPinImages() async {
@@ -90,13 +96,6 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
         'lib/shared/icons/Pin-Naranja.svg',
         width: 30,
         height: 36,
-      );
-      await addSvgPinToMap(
-        _mapboxMap!,
-        'mototaxi-mapa',
-        'lib/shared/icons/MototaxiMapa.svg',
-        width: 40,
-        height: 40,
       );
       _pinImagesLoaded = true;
     } catch (e) {
@@ -204,34 +203,32 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     );
   }
 
-  void _updateDriverMarker(DriverPosition pos) {
-    if (_driverMarkerManager == null) return;
+  void _updateDriverMarker(DriverPosition pos) async {
+    final manager = _driverCircleManager;
+    if (manager == null) return;
 
-    // Solo dibujar el marker si el viaje está aceptado o en curso
+    // Solo mostrar el marcador si el viaje está aceptado o en curso.
     final status = ref.read(tripInProgressViewModelProvider).trip?.status;
     if (status != TripStatus.aceptado && status != TripStatus.enCurso) return;
 
+    final point = Point(coordinates: Position(pos.longitude, pos.latitude));
     try {
-      _driverMarkerManager!.deleteAll();
-      _driverMarkerManager!
-          .create(PointAnnotationOptions(
-            geometry: Point(
-              coordinates: Position(pos.longitude, pos.latitude),
-            ),
-            iconImage: 'mototaxi-mapa',
-            iconSize: 1.0,
-          ));
-
-      // Seguir al conductor con la cámara (suave, sin animation rápida)
-      _mapboxMap?.flyTo(
-        CameraOptions(
-          center: Point(coordinates: Position(pos.longitude, pos.latitude)),
-          zoom: 15.0,
-        ),
-        MapAnimationOptions(duration: 1200),
-      );
+      if (_driverCircle == null) {
+        // Punto de "ubicación en vivo" del conductor (círculo, sin depender de SVG).
+        _driverCircle = await manager.create(CircleAnnotationOptions(
+          geometry: point,
+          circleRadius: 9.0,
+          circleColor: JalaBrand.amber.toARGB32(),
+          circleStrokeWidth: 3.0,
+          circleStrokeColor: 0xFFFFFFFF,
+        ));
+      } else {
+        // Mover el círculo existente (no recrear: evita parpadeo).
+        _driverCircle!.geometry = point;
+        await manager.update(_driverCircle!);
+      }
     } catch (e) {
-      debugPrint('[TripInProgress] Error actualizando marker: $e');
+      debugPrint('[TripInProgress] Error actualizando marcador del conductor: $e');
     }
   }
 
