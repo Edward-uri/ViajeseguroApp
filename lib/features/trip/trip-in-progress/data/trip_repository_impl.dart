@@ -36,6 +36,7 @@ class TripRepositoryImpl implements TripRepository {
     required TripLocation destination,
     int personas = 1,
     int? idZonaDestino,
+    double? tarifaEstimada,
   }) async {
     final response = await _tripApi.createTrip(
       idMunicipio: idMunicipio,
@@ -47,6 +48,7 @@ class TripRepositoryImpl implements TripRepository {
       destinationAddress: destination.address,
       personas: personas,
       idZonaDestino: idZonaDestino,
+      tarifaEstimada: tarifaEstimada,
     );
 
     return Trip.fromJson(response);

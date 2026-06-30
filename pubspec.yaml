@@ -70,6 +70,7 @@ dependencies:
 
   # Render de SVG a bytes para pines personalizados en Mapbox.
   vector_graphics: ^1.1.18+1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

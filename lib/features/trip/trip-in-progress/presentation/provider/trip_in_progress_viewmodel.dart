@@ -48,26 +48,35 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     if (tripIdInt == null) return;
 
     // viaje:aceptado → objeto Viaje completo del viaje aceptado
-    // El conductor aceptó: actualizar con datos del conductor, vehículo, etc.
-    _acceptedSub = _socketService.onTripAccepted.listen((event) {
-      final updatedTrip = Trip.fromJson(event.data);
-      if (updatedTrip.id != tripId) return;
-
-      // Preservar el driverPosition si ya teníamos uno
-      state = state.copyWith(
-        trip: updatedTrip,
-        driverPosition: state.driverPosition,
-      );
+    // El conductor aceptó: refrescar para obtener datos completos del conductor
+    _acceptedSub = _socketService.onTripAccepted.listen((event) async {
+      if (event.idViaje != tripIdInt) return;
+      // Refrescar para obtener driverName, driverPhone, vehicleInfo, etc.
+      await _refreshTrip(tripId);
     });
 
     // viaje:cambio_estado → { idViaje, estado }
-    // en_curso, completado, cancelado
-    _stateChangeSub = _socketService.onTripStateChanged.listen((event) {
+    // en_curso, completado, cancelado, solicitado (regreso del conductor)
+    _stateChangeSub = _socketService.onTripStateChanged.listen((event) async {
       if (event.idViaje != tripIdInt) return;
       final newStatus = event.estado;
       if (newStatus == null) return;
 
       final parsed = Trip.parseStatus(newStatus);
+
+      // Si volvió a solicitado (conductor soltó el viaje),
+      // refrescar para obtener expiraEn actualizado
+      if (parsed == TripStatus.solicitado) {
+        await _refreshTrip(tripId);
+        return;
+      }
+
+      // Si se canceló, refrescar para obtener canceladoPor/motivo
+      if (parsed == TripStatus.cancelado) {
+        await _refreshTrip(tripId);
+        return;
+      }
+
       final updatedTrip = state.trip?.copyWith(status: parsed) ??
           Trip(
             id: tripId,
@@ -82,8 +91,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
         driverPosition: state.driverPosition,
       );
 
-      if (parsed == TripStatus.completado ||
-          parsed == TripStatus.cancelado) {
+      if (parsed == TripStatus.completado) {
         _cleanup();
       }
     });
@@ -118,12 +126,13 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
       final trip = await _tripRepository.getTripById(tripId);
       state = state.copyWith(trip: trip, isLoading: false);
 
-      if (trip.status == TripStatus.completado ||
-          trip.status == TripStatus.cancelado) {
+      if (trip.status == TripStatus.completado) {
+        _cleanup();
+      } else if (trip.status == TripStatus.cancelado) {
         _cleanup();
       }
+      // Si volvió a solicitado, NO limpiar — seguir en la pantalla de búsqueda
     } catch (e) {
-      // No mostrar error en polling (es fallback del socket)
       debugPrint('[TripInProgress] Polling error: $e');
     }
   }

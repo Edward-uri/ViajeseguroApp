@@ -47,6 +47,7 @@ class TripApi {
     required String destinationAddress,
     int personas = 1,
     int? idZonaDestino,
+    double? tarifaEstimada,
   }) =>
       _api.post(
         ApiRoutes.viajes,
@@ -64,6 +65,7 @@ class TripApi {
           },
           if (idZonaDestino != null) 'idZonaDestino': idZonaDestino,
           'personas': personas,
+          if (tarifaEstimada != null) 'tarifaEstimada': tarifaEstimada,
         },
         auth: true,
       );

@@ -135,6 +135,7 @@ class JalaMapView extends StatefulWidget {
     this.onMapIdle,
     this.onCameraChanged,
     this.autoLocate = true,
+    this.styleUri,
   });
 
   final void Function(MapboxMap) onMapCreated;
@@ -148,6 +149,7 @@ class JalaMapView extends StatefulWidget {
   final void Function(CameraChangedEventData)? onCameraChanged;
   final void Function(MapIdleEventData)? onMapIdle;
   final bool autoLocate;
+  final String? styleUri;
 
   @override
   State<JalaMapView> createState() => _JalaMapViewState();
@@ -309,12 +311,15 @@ class _JalaMapViewState extends State<JalaMapView>
     final lat = widget.initialLatitude ?? _currentPosition?.latitude;
     final lng = widget.initialLongitude ?? _currentPosition?.longitude;
     final hasPosition = lat != null && lng != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final mapStyle = widget.styleUri ??
+        (isDark ? MapboxStyles.DARK : MapboxStyles.STANDARD);
 
     return Stack(
       children: [
         Positioned.fill(
           child: MapWidget(
-            key: const ValueKey("jalaMapWidget"),
+            key: ValueKey("jalaMapWidget_${isDark ? 'dark' : 'light'}"),
             cameraOptions: CameraOptions(
               center: Point(
                 coordinates: Position(
@@ -324,6 +329,7 @@ class _JalaMapViewState extends State<JalaMapView>
               ),
               zoom: hasPosition ? 16.0 : widget.initialZoom,
             ),
+            styleUri: mapStyle,
             onMapCreated: _handleMapCreated,
             onCameraChangeListener: widget.onCameraChanged,
             onMapIdleListener: widget.onMapIdle,

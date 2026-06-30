@@ -7,6 +7,7 @@ import '../../../../../core/auth/current_user_provider.dart';
 import '../../../../../core/di/core_module.dart';
 import '../../../../../routes/app_routes.dart';
 import '../../../../../shared/widgets/widgets.dart';
+import '../../../../../theme/jala_theme.dart';
 import '../../../../auth/di/auth_module.dart';
 import '../../../../trip/trip-in-progress/domain/entities/trip.dart';
 import '../../../../trip/trip-in-progress/presentation/provider/trip_in_progress_viewmodel.dart';
@@ -150,7 +151,7 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
     final vm = ref.watch(passengerHomeViewModelProvider);
     final user = ref.watch(currentUserProvider);
     final bottomPad = MediaQuery.of(context).padding.bottom;
-    final userName = user?.nombreCompleto ?? vm.greetingName;
+    final userName = user?.nombreParaMostrar ?? vm.greetingName;
     final userInitials = user?.iniciales ?? '?';
     final userSubtitle = user?.correoElectronico ?? user?.telefono ?? '';
     final selected = vm.selectedIndex;
@@ -266,7 +267,7 @@ class _HomeTabContent extends StatelessWidget {
           bottom: 100 + bottomPad,
           child: JalaFloatingCircleButton(
             icon: Icons.my_location,
-            iconColor: const Color(0xFF005B9F),
+            iconColor: context.brand.accentBlue,
             iconSize: 24,
             onTap: onLocationTap,
           ),
@@ -296,7 +297,7 @@ class _TripsTabContent extends StatelessWidget {
 }
 
 // ── Profile tab ─────────────────────────────────────────────────────────────
-class _ProfileTabContent extends StatelessWidget {
+class _ProfileTabContent extends ConsumerWidget {
   const _ProfileTabContent({
     super.key,
     required this.userName,
@@ -311,7 +312,10 @@ class _ProfileTabContent extends StatelessWidget {
   final VoidCallback onLogout;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider);
+    final userId = user?.idUsuario;
+
     return SafeArea(
       bottom: false,
       child: Column(
@@ -321,6 +325,7 @@ class _ProfileTabContent extends StatelessWidget {
               userName: userName,
               userInitials: userInitials,
               userSubtitle: userSubtitle,
+              userId: userId,
               sections: [
                 JalaSidebarSection(
                   label: 'CUENTA',

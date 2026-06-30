@@ -33,6 +33,7 @@ class Trip {
     this.fechaFin,
     this.canceladoPor,
     this.motivoCancelacion,
+    this.expiraEn,
   });
 
   final String id;
@@ -57,12 +58,24 @@ class Trip {
   final DateTime? fechaFin;
   final String? canceladoPor;
   final String? motivoCancelacion;
+  final DateTime? expiraEn;
 
   factory Trip.fromJson(Map<String, dynamic> json) {
     final origen = json['origen'] as Map<String, dynamic>? ?? {};
     final destino = json['destino'] as Map<String, dynamic>? ?? {};
     final tarifa = (json['tarifa'] as num?)?.toDouble() ?? 0.0;
     final distancia = (json['distanciaKm'] as num?)?.toDouble() ?? 0.0;
+
+    // Conductor: puede venir anidado en "conductor" o en campos planos
+    final conductor = json['conductor'] as Map<String, dynamic>?;
+    final driverName = conductor?['nombre'] as String? ?? json['driverName'] as String?;
+    final driverPhone = conductor?['telefono'] as String? ?? json['driverPhone'] as String?;
+
+    // Vehiculo: puede venir anidado en "vehiculo" o en campo plano
+    final vehiculo = json['vehiculo'] as Map<String, dynamic>?;
+    final vehicleInfo = vehiculo != null
+        ? '${vehiculo['marca'] ?? ''} ${vehiculo['modelo'] ?? ''} ${vehiculo['placa'] ?? ''}'.trim()
+        : json['vehicleInfo'] as String?;
 
     return Trip(
       id: (json['idViaje'] ?? json['id'] ?? 0).toString(),
@@ -93,15 +106,16 @@ class Trip {
       distanciaKm: distancia,
       tarifaEstimada: (json['tarifaEstimada'] as bool?) ?? false,
       numPasajeros: (json['numPasajeros'] as num?)?.toInt() ?? 1,
-      driverName: json['driverName'] as String?,
-      driverPhone: json['driverPhone'] as String?,
-      vehicleInfo: json['vehicleInfo'] as String?,
+      driverName: driverName,
+      driverPhone: driverPhone,
+      vehicleInfo: vehicleInfo,
       fechaSolicitud: _parseDate(json['fechaSolicitud']),
       fechaAceptacion: _parseDate(json['fechaAceptacion']),
       fechaInicio: _parseDate(json['fechaInicio']),
       fechaFin: _parseDate(json['fechaFin']),
       canceladoPor: json['canceladoPor'] as String?,
       motivoCancelacion: json['motivoCancelacion'] as String?,
+      expiraEn: _parseDate(json['expiraEn']),
     );
   }
 
@@ -146,6 +160,7 @@ class Trip {
     DateTime? fechaFin,
     String? canceladoPor,
     String? motivoCancelacion,
+    DateTime? expiraEn,
   }) {
     return Trip(
       id: id,
@@ -170,6 +185,7 @@ class Trip {
       fechaFin: fechaFin ?? this.fechaFin,
       canceladoPor: canceladoPor ?? this.canceladoPor,
       motivoCancelacion: motivoCancelacion ?? this.motivoCancelacion,
+      expiraEn: expiraEn ?? this.expiraEn,
     );
   }
 }

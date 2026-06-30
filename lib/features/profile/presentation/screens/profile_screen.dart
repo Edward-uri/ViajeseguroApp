@@ -11,6 +11,7 @@ import '../../../../shared/widgets/auth_image_provider.dart';
 import '../../../../shared/widgets/fade_slide_in.dart';
 import '../../../../shared/widgets/jala_alert_banner.dart';
 import '../../../../theme/theme.dart';
+import '../../../../theme/theme_extensions.dart';
 import '../provider/profile_viewmodel.dart';
 
 const Map<String, String> _allowedImageMimeByExt = <String, String>{
@@ -61,7 +62,9 @@ class _ProfileView extends ConsumerWidget {
     }
 
     return Scaffold(
+      backgroundColor: context.colors.surface,
       appBar: AppBar(
+        backgroundColor: context.colors.surface,
         title: const Text('Mi perfil'),
         actions: [
           IconButton(
@@ -126,6 +129,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
   late TextEditingController _telefonoCtrl;
   late TextEditingController _correoCtrl;
   DateTime? _fechaNacimiento;
+  int? _idSexo;
   bool _isEditing = false;
   bool _initialized = false;
 
@@ -153,6 +157,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
     _telefonoCtrl = TextEditingController(text: user.telefono);
     _correoCtrl = TextEditingController(text: user.correoElectronico ?? '');
     _fechaNacimiento = user.fechaNacimiento;
+    _idSexo = user.idSexo;
   }
 
   @override
@@ -291,6 +296,8 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                     const SizedBox(height: 12),
                     _buildField(_telefonoCtrl, 'Telefono', scheme, text, keyboard: TextInputType.phone),
                     const SizedBox(height: 12),
+                    _buildSexoField(scheme, text),
+                    const SizedBox(height: 12),
                     _buildDateField(scheme, text),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -321,6 +328,8 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                       _infoTile(Icons.phone_outlined, 'Telefono', user.telefono, scheme),
                       _divider(scheme),
                       _infoTile(Icons.email_outlined, 'Correo', user.correoElectronico ?? 'Sin correo', scheme),
+                      _divider(scheme),
+                      _infoTile(Icons.wc_outlined, 'Sexo', _sexoLabel(user.idSexo), scheme),
                       _divider(scheme),
                       _infoTile(
                         Icons.cake_outlined,
@@ -428,7 +437,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: JalaBrand.ink, width: 2),
+          borderSide: BorderSide(color: context.isDark ? JalaBrand.amberDeep : JalaBrand.ink, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
@@ -461,6 +470,49 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
         ),
       ),
     );
+  }
+
+  Widget _buildSexoField(ColorScheme scheme, TextTheme text) {
+    return DropdownButtonFormField<int>(
+      initialValue: _idSexo,
+      isExpanded: true,
+      dropdownColor: scheme.surfaceContainerLow,
+      decoration: InputDecoration(
+        labelText: 'Sexo',
+        labelStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        filled: true,
+        fillColor: scheme.surfaceContainerLow,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: context.isDark ? JalaBrand.amberDeep : JalaBrand.ink, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      items: const [
+        DropdownMenuItem(value: 1, child: Text('Masculino')),
+        DropdownMenuItem(value: 2, child: Text('Femenino')),
+        DropdownMenuItem(value: 3, child: Text('Otro')),
+      ],
+      onChanged: (value) => setState(() => _idSexo = value),
+    );
+  }
+
+  String _sexoLabel(int? id) {
+    switch (id) {
+      case 1:
+        return 'Masculino';
+      case 2:
+        return 'Femenino';
+      case 3:
+        return 'Otro';
+      default:
+        return 'Sin dato';
+    }
   }
 
   Widget _infoTile(IconData icon, String label, String value, ColorScheme scheme) {
@@ -513,6 +565,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
       nombre: nombre,
       apellidoPaterno: apellidoPaterno,
       apellidoMaterno: apellidoMaterno.isEmpty ? '' : apellidoMaterno,
+      idSexo: _idSexo,
       fechaNacimiento: _fechaNacimiento != null
           ? '${_fechaNacimiento!.year}-${_fechaNacimiento!.month.toString().padLeft(2, '0')}-${_fechaNacimiento!.day.toString().padLeft(2, '0')}'
           : null,

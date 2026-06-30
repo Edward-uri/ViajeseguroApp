@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/theme.dart';
+import '../../theme/theme_extensions.dart';
+
 enum JalaAlertType { error, success, warning, info }
 
 class JalaAlertBanner extends StatefulWidget {
@@ -47,40 +50,46 @@ class _JalaAlertBannerState extends State<JalaAlertBanner>
     super.dispose();
   }
 
-  Color _backgroundColor(ColorScheme s) {
+  Color _backgroundColor(BuildContext context) {
+    final brand = context.brand;
+    final s = Theme.of(context).colorScheme;
     switch (widget.type) {
       case JalaAlertType.error:
         return s.errorContainer;
       case JalaAlertType.success:
-        return const Color(0xFFE8F5E9);
+        return brand.successLight;
       case JalaAlertType.warning:
-        return const Color(0xFFFFF8E1);
+        return brand.accentSurface;
       case JalaAlertType.info:
         return s.primaryContainer;
     }
   }
 
-  Color _accentColor(ColorScheme s) {
+  Color _accentColor(BuildContext context) {
+    final brand = context.brand;
+    final s = Theme.of(context).colorScheme;
     switch (widget.type) {
       case JalaAlertType.error:
         return s.error;
       case JalaAlertType.success:
-        return const Color(0xFF2E7D32);
+        return brand.success;
       case JalaAlertType.warning:
-        return const Color(0xFFF57C00);
+        return context.isDark ? JalaBrand.amberLight : JalaBrand.amber;
       case JalaAlertType.info:
         return s.primary;
     }
   }
 
-  Color _textColor(ColorScheme s) {
+  Color _textColor(BuildContext context) {
+    final brand = context.brand;
+    final s = Theme.of(context).colorScheme;
     switch (widget.type) {
       case JalaAlertType.error:
         return s.onErrorContainer;
       case JalaAlertType.success:
-        return const Color(0xFF1B5E20);
+        return brand.success;
       case JalaAlertType.warning:
-        return const Color(0xFFE65100);
+        return context.isDark ? JalaBrand.amberLight : JalaBrand.amberDeep;
       case JalaAlertType.info:
         return s.onPrimaryContainer;
     }
@@ -101,11 +110,10 @@ class _JalaAlertBannerState extends State<JalaAlertBanner>
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final bg = _backgroundColor(scheme);
-    final accent = _accentColor(scheme);
-    final txt = _textColor(scheme);
+    final bg = _backgroundColor(context);
+    final accent = _accentColor(context);
+    final txt = _textColor(context);
 
     return FadeTransition(
       opacity: _fade,

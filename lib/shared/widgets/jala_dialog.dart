@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/theme.dart';
+import '../../theme/theme_extensions.dart';
 import 'jala_alert_banner.dart';
 
 class JalaDialog extends StatelessWidget {
@@ -69,12 +70,13 @@ class JalaDialog extends StatelessWidget {
     );
   }
 
-  Color _accentColor(ColorScheme s) {
+  Color _accentColor(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
     switch (type) {
       case JalaAlertType.error:
         return s.error;
       case JalaAlertType.success:
-        return const Color(0xFF2E7D32);
+        return context.brand.success;
       case JalaAlertType.warning:
         return JalaBrand.amber;
       case JalaAlertType.info:
@@ -99,7 +101,7 @@ class JalaDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final accent = _accentColor(scheme);
+    final accent = _accentColor(context);
 
     return Dialog(
       shape: RoundedRectangleBorder(

@@ -39,13 +39,13 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
               children: [
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 100),
-                  child: const Text(
+                  child: Text(
                     'Mis viajes',
                     style: TextStyle(
                       fontFamily: 'Plus Jakarta Sans',
                       fontSize: 28,
                       fontWeight: FontWeight.w700,
-                      color: JalaBrand.ink,
+                      color: context.colors.onSurface,
                     ),
                   ),
                 ),
@@ -124,7 +124,7 @@ class _FilterTabsState extends State<_FilterTabs> {
               onTap: () => setState(() => _selected = index),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isActive ? Colors.white : Colors.transparent,
+                  color: isActive ? context.colors.surfaceContainerLow : Colors.transparent,
                   borderRadius: BorderRadius.circular(9),
                   boxShadow: isActive
                       ? [
@@ -145,7 +145,7 @@ class _FilterTabsState extends State<_FilterTabs> {
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: isActive
-                        ? JalaBrand.ink
+                        ? context.colors.onSurface
                         : context.brand.greyDark,
                   ),
                 ),
@@ -225,17 +225,22 @@ class _TripHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isCompletado = item.isCompletado;
+    final isEnCurso = item.isEnCurso;
     final badgeColor = isCompletado
         ? context.brand.successLight
-        : context.brand.destructiveLight;
+        : isEnCurso
+            ? JalaBrand.amberLight
+            : context.brand.destructiveLight;
     final badgeText = isCompletado
         ? context.brand.success
-        : context.brand.destructive;
+        : isEnCurso
+            ? JalaBrand.amberDeep
+            : context.brand.destructive;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.brand.divider, width: 1),
         boxShadow: [
@@ -273,11 +278,11 @@ class _TripHistoryCard extends StatelessWidget {
                   children: [
                     Text(
                       _formatFecha(item.fecha),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: JalaBrand.ink,
+                        color: context.colors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -346,21 +351,21 @@ class _TripHistoryCard extends StatelessWidget {
                   children: [
                     Text(
                       item.originAddress,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: JalaBrand.ink,
+                        color: context.colors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 10),
                     Text(
                       item.destinationAddress,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
-                        color: JalaBrand.ink,
+                        color: context.colors.onSurface,
                       ),
                     ),
                   ],
@@ -381,11 +386,11 @@ class _TripHistoryCard extends StatelessWidget {
                 isCompletado
                     ? '\$${item.tarifa.toStringAsFixed(2)}'
                     : '—',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Plus Jakarta Sans',
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
-                  color: JalaBrand.ink,
+                  color: context.colors.onSurface,
                 ),
               ),
               Text(

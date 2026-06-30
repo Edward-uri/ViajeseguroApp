@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../routes/app_routes.dart';
 import '../../../../../shared/utils/svg_to_mapbox.dart';
@@ -274,7 +277,14 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
             top: topPad + 16,
             left: 24,
             child: JalaBackButton(
-              onTap: () => _showExitConfirm(context),
+              onTap: () {
+                final status = ref.read(tripInProgressViewModelProvider).trip?.status;
+                if (status == TripStatus.completado || status == TripStatus.cancelado) {
+                  Navigator.of(context).pop();
+                } else {
+                  _showExitConfirm(context);
+                }
+              },
             ),
           ),
           Positioned(
@@ -284,31 +294,6 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
               icon: Icons.menu_rounded,
               onTap: () {},
             ),
-          ),
-          // Icono del mototaxi flotando sobre el mapa — solo cuando hay conductor
-          Consumer(
-            builder: (context, ref, _) {
-              final status = ref.watch(
-                tripInProgressViewModelProvider
-                    .select((s) => (s.trip ?? widget.trip).status),
-              );
-              if (status != TripStatus.aceptado &&
-                  status != TripStatus.enCurso) {
-                return const SizedBox.shrink();
-              }
-              return Positioned(
-                top: topPad + 80,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: SvgPicture.asset(
-                    'lib/shared/icons/MototaxiMapa.svg',
-                    width: 48,
-                    height: 48,
-                  ),
-                ),
-              );
-            },
           ),
           // Panel: se reconstruye con el viaje (poll de 5s) o isLoading,
           // NO en cada tick de driverPosition (que no se renderiza).
@@ -329,6 +314,7 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
                   isLoading: isLoading,
                   bottomPad: bottomPad,
                   onCancel: () => _showCancelDialog(context),
+                  onCallDriver: _callDriver,
                 );
               },
             ),
@@ -358,6 +344,19 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
       ref.read(tripInProgressViewModelProvider.notifier).cancelTrip(motivo: motivo);
     }
   }
+
+  void _callDriver(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo llamar al $phone')),
+        );
+      }
+    }
+  }
 }
 
 class _TripBottomPanel extends StatefulWidget {
@@ -366,12 +365,14 @@ class _TripBottomPanel extends StatefulWidget {
     required this.isLoading,
     required this.bottomPad,
     required this.onCancel,
+    required this.onCallDriver,
   });
 
   final Trip trip;
   final bool isLoading;
   final double bottomPad;
   final VoidCallback onCancel;
+  final void Function(String phone) onCallDriver;
 
   @override
   State<_TripBottomPanel> createState() => _TripBottomPanelState();
@@ -380,12 +381,13 @@ class _TripBottomPanel extends StatefulWidget {
 class _TripBottomPanelState extends State<_TripBottomPanel>
     with SingleTickerProviderStateMixin {
   static final _whitespace = RegExp(r'\s+');
-  static const _searchDuration = Duration(minutes: 2);
   static const _searchStart = 0.1;
   static const _searchEnd = 0.63;
 
   AnimationController? _searchController;
+  Timer? _countdownTimer;
   bool _wasSearching = false;
+  String _countdownText = '';
 
   Trip get trip => widget.trip;
 
@@ -401,31 +403,69 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
     _ensureSearchController();
   }
 
+  Duration get _searchDuration {
+    final expiraEn = trip.expiraEn;
+    if (expiraEn == null) return const Duration(minutes: 5);
+    final remaining = expiraEn.difference(DateTime.now());
+    if (remaining.isNegative) return Duration.zero;
+    return remaining;
+  }
+
   void _ensureSearchController() {
     final isSearching = trip.status == TripStatus.solicitado;
 
     if (isSearching && !_wasSearching) {
-      // Empezó a buscar → iniciar animación de 2 min
       _searchController?.dispose();
+      _countdownTimer?.cancel();
+
+      final duration = _searchDuration;
+      _updateCountdownText();
+
       _searchController = AnimationController(
         vsync: this,
-        duration: _searchDuration,
+        duration: duration,
         lowerBound: _searchStart,
         upperBound: _searchEnd,
         value: _searchStart,
       )..forward();
+
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        _updateCountdownText();
+      });
+
       _wasSearching = true;
     } else if (!isSearching && _wasSearching) {
-      // Dejó de buscar → detener animación
       _searchController?.stop();
       _searchController?.dispose();
       _searchController = null;
+      _countdownTimer?.cancel();
+      _countdownTimer = null;
+      _countdownText = '';
       _wasSearching = false;
     }
   }
 
+  void _updateCountdownText() {
+    final expiraEn = trip.expiraEn;
+    if (expiraEn == null) {
+      setState(() => _countdownText = '');
+      return;
+    }
+    final remaining = expiraEn.difference(DateTime.now());
+    if (remaining.isNegative) {
+      setState(() => _countdownText = '0:00');
+      return;
+    }
+    final minutes = remaining.inMinutes;
+    final seconds = remaining.inSeconds % 60;
+    setState(() {
+      _countdownText = '$minutes:${seconds.toString().padLeft(2, '0')}';
+    });
+  }
+
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _searchController?.dispose();
     super.dispose();
   }
@@ -435,19 +475,24 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
       case TripStatus.solicitado:
         return 'Buscando mototaxi';
       case TripStatus.aceptado:
-        return 'Llega en 3 min';
+        return 'Llega tu mototaxi';
       case TripStatus.enCurso:
         return 'En viaje';
       case TripStatus.completado:
         return 'Viaje completado';
       case TripStatus.cancelado:
-        return 'Viaje cancelado';
+        return trip.canceladoPor == 'sistema'
+            ? 'Sin conductor disponible'
+            : 'Viaje cancelado';
     }
   }
 
   String get _statusSubtitle {
     switch (trip.status) {
       case TripStatus.solicitado:
+        if (_countdownText.isNotEmpty) {
+          return 'Expira en $_countdownText';
+        }
         return 'Esperando conductor';
       case TripStatus.aceptado:
         return 'Tu mototaxi esta en camino';
@@ -456,7 +501,9 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
       case TripStatus.completado:
         return 'Gracias por usar Jala';
       case TripStatus.cancelado:
-        return 'El viaje fue cancelado';
+        return trip.canceladoPor == 'sistema'
+            ? 'Intenta de nuevo'
+            : 'El viaje fue cancelado';
     }
   }
 
@@ -601,15 +648,17 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
                           name: trip.driverName ?? 'Conductor',
                           rating: '4.9',
                           vehicleInfo: trip.vehicleInfo ?? 'Mototaxi',
-                          plate: 'ABC-123',
+                          plate: trip.vehicleInfo ?? 'Sin placa',
+                          phone: trip.driverPhone,
                         ),
                         const SizedBox(height: 16),
-                        _ActionButton(
-                          label: 'Mensaje',
-                          icon: Icons.chat_bubble_rounded,
-                          isOutlined: false,
-                          onTap: () {},
-                        ),
+                        if (trip.driverPhone != null)
+                          _ActionButton(
+                            label: 'Llamar',
+                            icon: Icons.phone_rounded,
+                            isOutlined: false,
+                            onTap: () => widget.onCallDriver(trip.driverPhone!),
+                          ),
                       ],
                     ),
             ),
@@ -747,6 +796,7 @@ class _DriverCard extends StatelessWidget {
     required this.rating,
     required this.vehicleInfo,
     required this.plate,
+    this.phone,
   });
 
   final String initials;
@@ -754,6 +804,7 @@ class _DriverCard extends StatelessWidget {
   final String rating;
   final String vehicleInfo;
   final String plate;
+  final String? phone;
 
   @override
   Widget build(BuildContext context) {
@@ -803,7 +854,7 @@ class _DriverCard extends StatelessWidget {
                     const Icon(Icons.star_rounded, size: 14, color: JalaBrand.amber),
                     const SizedBox(width: 4),
                     Text(
-                      '$rating · $vehicleInfo',
+                      vehicleInfo,
                       style: TextStyle(
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 13,
@@ -813,22 +864,40 @@ class _DriverCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (phone != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.phone_outlined, size: 12, color: context.brand.greyDark),
+                      const SizedBox(width: 4),
+                      Text(
+                        phone!,
+                        style: TextStyle(
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w400,
+                          color: context.brand.greyDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: context.colors.onSurface,
+              color: context.colors.inverseSurface,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               plate,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Plus Jakarta Sans',
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: context.colors.onInverseSurface,
               ),
             ),
           ),
@@ -1041,7 +1110,7 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
             child: _isOpen
-                ? Container(
+                    ? Container(
                     margin: const EdgeInsets.only(top: 4),
                     decoration: BoxDecoration(
                       color: scheme.surfaceContainerLow,
@@ -1049,7 +1118,7 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
                       border: Border.all(color: scheme.outlineVariant),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
+                          color: scheme.onSurface.withValues(alpha: 0.08),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -1116,7 +1185,7 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: JalaBrand.ink, width: 2),
+                  borderSide: BorderSide(color: context.isDark ? JalaBrand.amberDeep : JalaBrand.ink, width: 2),
                 ),
               ),
               onChanged: (_) => setState(() {}),

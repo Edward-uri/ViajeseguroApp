@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../theme/theme.dart';
+import '../../theme/theme_extensions.dart';
 
 class LogoBadge extends StatelessWidget {
   const LogoBadge({super.key, this.size = 132});
 
   final double size;
-
-  static const Color _disc = Color(0xfffffdf9);
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +17,7 @@ class LogoBadge extends StatelessWidget {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: _disc,
+        color: context.colors.surface,
         border: Border.all(color: JalaBrand.amber, width: size * 0.022),
         boxShadow: [
           BoxShadow(
@@ -28,7 +27,7 @@ class LogoBadge extends StatelessWidget {
             offset: Offset(0, size * 0.06),
           ),
           BoxShadow(
-            color: JalaBrand.ink.withValues(alpha: 0.06),
+            color: context.colors.onSurface.withValues(alpha: 0.06),
             blurRadius: size * 0.10,
             offset: Offset(0, size * 0.03),
           ),

@@ -111,7 +111,6 @@ class _FormAdditionalStepState extends ConsumerState<FormAdditionalStep> {
             label: 'Contrasena',
             enabled: !widget.state.isLoading,
             obscureText: !_passwordVisible,
-            hintText: 'Minimo 8 caracteres, una mayuscula, un numero',
             onChanged: widget.vm.setContrasena,
             suffixIcon: IconButton(
               icon: Icon(
@@ -432,7 +431,7 @@ class _MunicipioDropdownState extends ConsumerState<_MunicipioDropdown> with Sin
               border: Border.all(color: scheme.outlineVariant),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: scheme.onSurface.withValues(alpha: 0.08),
                   blurRadius: 8,
                   offset: const Offset(0, 4),
                 ),

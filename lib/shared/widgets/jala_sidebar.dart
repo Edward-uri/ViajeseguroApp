@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/di/core_module.dart';
 import '../../theme/jala_theme.dart';
+import 'auth_image_provider.dart';
 import 'fade_slide_in.dart';
 
 class JalaSidebarOption {
@@ -33,6 +36,7 @@ class JalaSidebar extends StatelessWidget {
     required this.sections,
     required this.onLogout,
     this.logoutLabel = 'Cerrar sesion',
+    this.userId,
   });
 
   final String userName;
@@ -41,11 +45,13 @@ class JalaSidebar extends StatelessWidget {
   final List<JalaSidebarSection> sections;
   final VoidCallback onLogout;
   final String logoutLabel;
+  final int? userId;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final topPad = MediaQuery.of(context).padding.top;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Material(
       color: context.brand.surfaceLight,
@@ -63,7 +69,7 @@ class JalaSidebar extends StatelessWidget {
                   'Menu',
                   style: text.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: JalaBrand.ink,
+                    color: onSurface,
                   ),
                 ),
               ),
@@ -74,6 +80,7 @@ class JalaSidebar extends StatelessWidget {
                   initials: userInitials,
                   name: userName,
                   subtitle: userSubtitle,
+                  userId: userId,
                 ),
               ),
               const SizedBox(height: 24),
@@ -103,15 +110,18 @@ class _UserCard extends StatelessWidget {
     required this.initials,
     required this.name,
     required this.subtitle,
+    this.userId,
   });
 
   final String initials;
   final String name;
   final String subtitle;
+  final int? userId;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final apiClient = ProviderScope.containerOf(context).read(apiClientProvider);
 
     return Container(
       height: 96,
@@ -126,14 +136,32 @@ class _UserCard extends StatelessWidget {
               color: JalaBrand.amber,
               shape: BoxShape.circle,
             ),
+            clipBehavior: Clip.antiAlias,
             alignment: Alignment.center,
-            child: Text(
-              initials,
-              style: text.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
+            child: userId != null
+                ? Image(
+                    image: AuthImageProvider(
+                      userId: userId!,
+                      apiClient: apiClient,
+                    ),
+                    fit: BoxFit.cover,
+                    width: 64,
+                    height: 64,
+                    errorBuilder: (_, __, ___) => Text(
+                      initials,
+                      style: text.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                : Text(
+                    initials,
+                    style: text.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -146,7 +174,7 @@ class _UserCard extends StatelessWidget {
                   style: text.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 19,
-                    color: JalaBrand.ink,
+                    color: context.colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -223,12 +251,13 @@ class _OptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     final color = option.isDestructive
         ? context.brand.destructive
-        : JalaBrand.ink;
+        : onSurface;
     final iconColor = option.isDestructive
         ? context.brand.destructive
-        : JalaBrand.ink;
+        : onSurface;
 
     return ListTile(
       onTap: option.onTap,
@@ -291,7 +320,7 @@ class _LogoutCard extends StatelessWidget {
 
 BoxDecoration _cardDecoration(BuildContext context) {
   return BoxDecoration(
-    color: Colors.white,
+    color: context.colors.surfaceContainerLow,
     borderRadius: BorderRadius.circular(16),
     border: Border.all(color: context.brand.divider, width: 1),
     boxShadow: [

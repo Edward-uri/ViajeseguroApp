@@ -253,10 +253,18 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
         destination: state.destination!,
         personas: state.numPersonas,
         idZonaDestino: state.estimacion?.idZonaDestino,
+        tarifaEstimada: state.estimacion?.tarifa,
       );
       state = const TripSearchingViewModelState();
       return trip;
     } on ApiException catch (e) {
+      if (e.statusCode == 409) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'La tarifa cambio, vuelve a estimar',
+        );
+        return null;
+      }
       state = state.copyWith(
         isLoading: false,
         errorMessage: e.message,

@@ -125,11 +125,13 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
   void setContrasena(String v) {
     _contrasena = v;
     _updateCanSubmit();
+    state = state.copyWith();
   }
 
   void setConfirmarContrasena(String v) {
     _confirmarContrasena = v;
     _updateCanSubmit();
+    state = state.copyWith();
   }
 
   bool get passwordsMatch => _contrasena == _confirmarContrasena;
