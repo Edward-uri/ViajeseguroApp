@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../../shared/widgets/jala_alert_banner.dart';
-import '../../../../../theme/theme.dart';
+import '../../../../../shared/widgets/widgets.dart';
+import '../../../../../theme/jala_theme.dart';
 import '../../domain/entities/trip_history_item.dart';
 import '../provider/trip_history_viewmodel.dart';
 
@@ -37,27 +37,36 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Mis viajes',
-                  style: TextStyle(
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: JalaBrand.ink,
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 100),
+                  child: const Text(
+                    'Mis viajes',
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: JalaBrand.ink,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '${vm.totalEsteMes} viajes este mes',
-                  style: const TextStyle(
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xFF6B6661),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 200),
+                  child: Text(
+                    '${vm.totalEsteMes} viajes este mes',
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                      color: context.brand.greyDark,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                const _FilterTabs(),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 300),
+                  child: const _FilterTabs(),
+                ),
               ],
             ),
           ),
@@ -71,9 +80,12 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
                         padding: EdgeInsets.fromLTRB(24, 0, 24, 84 + bottomPad),
                         itemCount: vm.items.length,
                         itemBuilder: (context, index) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _TripHistoryCard(item: vm.items[index]),
+                          return FadeSlideIn(
+                            delay: Duration(milliseconds: 350 + (index * 80)),
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _TripHistoryCard(item: vm.items[index]),
+                            ),
                           );
                         },
                       ),
@@ -101,7 +113,7 @@ class _FilterTabsState extends State<_FilterTabs> {
       height: 46,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFECECEC),
+        color: context.brand.divider,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -115,11 +127,12 @@ class _FilterTabsState extends State<_FilterTabs> {
                   color: isActive ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(9),
                   boxShadow: isActive
-                      ? const [
+                      ? [
                           BoxShadow(
-                            color: Color.fromRGBO(26, 20, 15, 0.12),
+                            color: context.colors.onSurface
+                                .withValues(alpha: 0.12),
                             blurRadius: 4,
-                            offset: Offset(0, 1),
+                            offset: const Offset(0, 1),
                           ),
                         ]
                       : null,
@@ -133,7 +146,7 @@ class _FilterTabsState extends State<_FilterTabs> {
                     fontWeight: FontWeight.w600,
                     color: isActive
                         ? JalaBrand.ink
-                        : const Color(0xFF6B6661),
+                        : context.brand.greyDark,
                   ),
                 ),
               ),
@@ -160,27 +173,27 @@ class _EmptyState extends StatelessWidget {
           children: [
             JalaAlertBanner(message: errorMessage!),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No se pudieron cargar tus viajes',
               style: TextStyle(
                 fontFamily: 'Plus Jakarta Sans',
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF6B6661),
+                color: context.brand.greyDark,
               ),
             ),
           ],
         ),
       );
     }
-    return const Center(
+    return Center(
       child: Text(
         'No tienes viajes aun',
         style: TextStyle(
           fontFamily: 'Plus Jakarta Sans',
           fontSize: 16,
           fontWeight: FontWeight.w500,
-          color: Color(0xFF6B6661),
+          color: context.brand.greyDark,
         ),
       ),
     );
@@ -213,23 +226,23 @@ class _TripHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isCompletado = item.isCompletado;
     final badgeColor = isCompletado
-        ? const Color(0xFFE6F4EA)
-        : const Color(0xFFFCEAE6);
+        ? context.brand.successLight
+        : context.brand.destructiveLight;
     final badgeText = isCompletado
-        ? const Color(0xFF1E8E5A)
-        : const Color(0xFFD84315);
+        ? context.brand.success
+        : context.brand.destructive;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFECECEC), width: 1),
-        boxShadow: const [
+        border: Border.all(color: context.brand.divider, width: 1),
+        boxShadow: [
           BoxShadow(
-            color: Color.fromRGBO(26, 20, 15, 0.06),
+            color: context.colors.onSurface.withValues(alpha: 0.06),
             blurRadius: 16,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -242,7 +255,7 @@ class _TripHistoryCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1E0),
+                  color: context.brand.accentSurface,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(
@@ -270,11 +283,11 @@ class _TripHistoryCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       item.tipo,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 12,
                         fontWeight: FontWeight.w400,
-                        color: Color(0xFF6B6661),
+                        color: context.brand.greyDark,
                       ),
                     ),
                   ],
@@ -309,7 +322,7 @@ class _TripHistoryCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFF005B9F),
+                        color: context.brand.accentBlue,
                         width: 3,
                       ),
                     ),
@@ -317,12 +330,12 @@ class _TripHistoryCard extends StatelessWidget {
                   Container(
                     width: 2,
                     height: 16,
-                    color: const Color(0xFFD1D1D1),
+                    color: context.brand.greyBorder,
                   ),
-                  const Icon(
+                  Icon(
                     Icons.location_on,
                     size: 16,
-                    color: Color(0xFF005B9F),
+                    color: context.brand.accentBlue,
                   ),
                 ],
               ),
@@ -358,7 +371,7 @@ class _TripHistoryCard extends StatelessWidget {
           const SizedBox(height: 12),
           Container(
             height: 1,
-            color: const Color(0xFFECECEC),
+            color: context.brand.divider,
           ),
           const SizedBox(height: 12),
           Row(
@@ -377,11 +390,11 @@ class _TripHistoryCard extends StatelessWidget {
               ),
               Text(
                 isCompletado ? item.metodoPago : 'Cancelado',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Plus Jakarta Sans',
                   fontSize: 13,
                   fontWeight: FontWeight.w400,
-                  color: Color(0xFF6B6661),
+                  color: context.brand.greyDark,
                 ),
               ),
             ],

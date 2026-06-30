@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/di/core_module.dart';
+import '../../../../core/http/api_client.dart';
 import '../../../../core/widgets/bubble_loader.dart';
 import '../../../../routes/app_routes.dart';
 import '../../../../shared/domain/entities/user.dart';
+import '../../../../shared/widgets/auth_image_provider.dart';
+import '../../../../shared/widgets/fade_slide_in.dart';
 import '../../../../shared/widgets/jala_alert_banner.dart';
+import '../../../../theme/theme.dart';
 import '../provider/profile_viewmodel.dart';
 
 const Map<String, String> _allowedImageMimeByExt = <String, String>{
@@ -45,7 +50,7 @@ class _ProfileView extends ConsumerWidget {
     final vm = ref.watch(profileViewModelProvider);
     final scheme = Theme.of(context).colorScheme;
 
-    if (vm.user == null && vm.errorMessage != null && !vm.isLoading) {
+    if (vm.hasSessionExpired) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.mounted) return;
         Navigator.of(context).pushNamedAndRemoveUntil(
@@ -77,10 +82,22 @@ class _ProfileView extends ConsumerWidget {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(
-                    vm.errorMessage ?? 'No se pudo cargar el perfil',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, size: 48, color: scheme.error),
+                      const SizedBox(height: 16),
+                      Text(
+                        vm.errorMessage ?? 'No se pudo cargar el perfil',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.tonal(
+                        onPressed: () => ref.read(profileViewModelProvider.notifier).loadProfile(),
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -93,61 +110,240 @@ class _ProfileView extends ConsumerWidget {
   }
 }
 
-class _ProfileContent extends ConsumerWidget {
+class _ProfileContent extends ConsumerStatefulWidget {
   const _ProfileContent({required this.user});
 
   final User user;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProfileContent> createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends ConsumerState<_ProfileContent> {
+  late TextEditingController _nombreCtrl;
+  late TextEditingController _apellidoPaternoCtrl;
+  late TextEditingController _apellidoMaternoCtrl;
+  late TextEditingController _telefonoCtrl;
+  late TextEditingController _correoCtrl;
+  DateTime? _fechaNacimiento;
+  bool _isEditing = false;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initControllers(widget.user);
+      _initialized = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProfileContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.user != widget.user) {
+      _initControllers(widget.user);
+    }
+  }
+
+  void _initControllers(User user) {
+    _nombreCtrl = TextEditingController(text: user.nombre ?? '');
+    _apellidoPaternoCtrl = TextEditingController(text: user.apellidoPaterno ?? '');
+    _apellidoMaternoCtrl = TextEditingController(text: user.apellidoMaterno ?? '');
+    _telefonoCtrl = TextEditingController(text: user.telefono);
+    _correoCtrl = TextEditingController(text: user.correoElectronico ?? '');
+    _fechaNacimiento = user.fechaNacimiento;
+  }
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _apellidoPaternoCtrl.dispose();
+    _apellidoMaternoCtrl.dispose();
+    _telefonoCtrl.dispose();
+    _correoCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final vm = ref.watch(profileViewModelProvider);
     final scheme = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final user = widget.user;
+    final apiClient = ref.watch(apiClientProvider);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       children: [
-        Center(
-          child: _Avatar(
-            url: user.fotoPerfilUrl,
-            initials: user.iniciales,
-            isUploading: vm.isUploadingPhoto,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 100),
+          child: Center(
+            child: GestureDetector(
+              onTap: vm.isUploadingPhoto ? null : () => _pickAndUploadPhoto(context, ref),
+              child: Stack(
+                children: [
+                  _Avatar(
+                    userId: user.idUsuario,
+                    url: user.fotoPerfilUrl,
+                    initials: user.iniciales,
+                    isUploading: vm.isUploadingPhoto,
+                    apiClient: apiClient,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: scheme.surface, width: 2),
+                      ),
+                      child: Icon(Icons.camera_alt, size: 16, color: scheme.onPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 16),
-        Center(
-          child: Text(
-            user.nombreCompleto,
-            style: text.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: scheme.onSurface,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 200),
+          child: Center(
+            child: Text(
+              user.nombreCompleto,
+              style: text.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
+              ),
             ),
           ),
         ),
         const SizedBox(height: 4),
-        Center(
-          child: Text(
-            user.rol.toUpperCase(),
-            style: text.labelSmall?.copyWith(
-              color: scheme.secondary,
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w700,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 250),
+          child: Center(
+            child: Text(
+              user.rol.toUpperCase(),
+              style: text.labelSmall?.copyWith(
+                color: scheme.secondary,
+                letterSpacing: 1.2,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
         const SizedBox(height: 32),
-        Card(
-          child: ListTile(
-            leading:
-                Icon(Icons.event_outlined, color: scheme.onSurfaceVariant),
-            title: const Text('Fecha de registro'),
-            subtitle: Text(
-              user.fechaRegistro != null
-                  ? _formatDate(user.fechaRegistro!)
-                  : 'Sin dato',
-            ),
+
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 300),
+          child: Row(
+            children: [
+              Text(
+                'Datos personales',
+                style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const Spacer(),
+              if (!_isEditing)
+                TextButton.icon(
+                  onPressed: vm.isSaving ? null : () => setState(() => _isEditing = true),
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  label: const Text('Editar'),
+                )
+              else
+                TextButton(
+                  onPressed: vm.isSaving
+                      ? null
+                      : () {
+                          setState(() => _isEditing = false);
+                          _initControllers(user);
+                        },
+                  child: const Text('Cancelar'),
+                ),
+            ],
           ),
         ),
+        const SizedBox(height: 8),
+
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.05),
+                end: Offset.zero,
+              ).animate(anim),
+              child: child,
+            ),
+          ),
+          child: _isEditing
+              ? Column(
+                  key: const ValueKey('edit'),
+                  children: [
+                    _buildField(_nombreCtrl, 'Nombre', scheme, text),
+                    const SizedBox(height: 12),
+                    _buildField(_apellidoPaternoCtrl, 'Apellido paterno', scheme, text),
+                    const SizedBox(height: 12),
+                    _buildField(_apellidoMaternoCtrl, 'Apellido materno (opcional)', scheme, text),
+                    const SizedBox(height: 12),
+                    _buildField(_telefonoCtrl, 'Telefono', scheme, text, keyboard: TextInputType.phone),
+                    const SizedBox(height: 12),
+                    _buildDateField(scheme, text),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: vm.isSaving ? null : () => _saveProfile(ref),
+                        child: vm.isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Guardar cambios'),
+                      ),
+                    ),
+                  ],
+                )
+              : Card(
+                  key: const ValueKey('view'),
+                  child: Column(
+                    children: [
+                      _infoTile(Icons.person_outline, 'Nombre', user.nombre ?? 'Sin nombre', scheme),
+                      _divider(scheme),
+                      _infoTile(Icons.badge_outlined, 'Apellido paterno', user.apellidoPaterno ?? 'Sin apellido', scheme),
+                      _divider(scheme),
+                      _infoTile(Icons.badge_outlined, 'Apellido materno', user.apellidoMaterno ?? 'Sin apellido', scheme),
+                      _divider(scheme),
+                      _infoTile(Icons.phone_outlined, 'Telefono', user.telefono, scheme),
+                      _divider(scheme),
+                      _infoTile(Icons.email_outlined, 'Correo', user.correoElectronico ?? 'Sin correo', scheme),
+                      _divider(scheme),
+                      _infoTile(
+                        Icons.cake_outlined,
+                        'Fecha de nacimiento',
+                        user.fechaNacimiento != null
+                            ? _formatDate(user.fechaNacimiento!)
+                            : 'Sin dato',
+                        scheme,
+                      ),
+                      _divider(scheme),
+                      _infoTile(
+                        Icons.event_outlined,
+                        'Fecha de registro',
+                        user.fechaRegistro != null
+                            ? _formatDate(user.fechaRegistro!)
+                            : 'Sin dato',
+                        scheme,
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+
         if (vm.errorMessage != null) ...[
           const SizedBox(height: 16),
           JalaAlertBanner(
@@ -157,49 +353,180 @@ class _ProfileContent extends ConsumerWidget {
           ),
         ],
         const SizedBox(height: 24),
-        Text('Acciones',
-            style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 400),
+          child: Text('Acciones',
+              style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+        ),
         const SizedBox(height: 8),
-        FilledButton.tonalIcon(
-          onPressed: vm.isUploadingPhoto || vm.isDeleting
-              ? null
-              : () => _pickAndUploadPhoto(context, ref),
-          icon: const Icon(Icons.photo_camera_outlined),
-          label: const Text('Cambiar foto de perfil'),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 450),
+          child: FilledButton.tonalIcon(
+            onPressed: vm.isUploadingPhoto || vm.isDeleting
+                ? null
+                : () => _pickAndUploadPhoto(context, ref),
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: const Text('Cambiar foto de perfil'),
+          ),
         ),
         const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: vm.isDeleting
-              ? null
-              : () async {
-                  await ref.read(profileViewModelProvider.notifier).logout();
-                  if (!context.mounted) return;
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    AppRoutes.login,
-                    (route) => false,
-                  );
-                },
-          icon: const Icon(Icons.logout),
-          label: const Text('Cerrar sesión'),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 500),
+          child: OutlinedButton.icon(
+            onPressed: vm.isDeleting
+                ? null
+                : () async {
+                    await ref.read(profileViewModelProvider.notifier).logout();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      AppRoutes.login,
+                      (route) => false,
+                    );
+                  },
+            icon: const Icon(Icons.logout),
+            label: const Text('Cerrar sesion'),
+          ),
         ),
         const SizedBox(height: 12),
-        TextButton.icon(
-          onPressed: vm.isDeleting
-              ? null
-              : () => _confirmDelete(context, ref),
-          icon: Icon(Icons.delete_outline, color: scheme.error),
-          label: Text(
-            'Eliminar mi cuenta',
-            style: TextStyle(color: scheme.error),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 550),
+          child: TextButton.icon(
+            onPressed: vm.isDeleting
+                ? null
+                : () => _confirmDelete(context, ref),
+            icon: Icon(Icons.delete_outline, color: scheme.error),
+            label: Text(
+              'Eliminar mi cuenta',
+              style: TextStyle(color: scheme.error),
+            ),
           ),
         ),
       ],
     );
   }
 
+  Widget _buildField(
+    TextEditingController ctrl,
+    String label,
+    ColorScheme scheme,
+    TextTheme text, {
+    TextInputType? keyboard,
+  }) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: keyboard,
+      style: text.bodyLarge?.copyWith(color: scheme.onSurface),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+        filled: true,
+        fillColor: scheme.surfaceContainerLow,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: JalaBrand.ink, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+    );
+  }
+
+  Widget _buildDateField(ColorScheme scheme, TextTheme text) {
+    final display = _fechaNacimiento != null ? _formatDate(_fechaNacimiento!) : 'Sin fecha';
+    return GestureDetector(
+      onTap: _pickDate,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Fecha de nacimiento',
+          labelStyle: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+          filled: true,
+          fillColor: scheme.surfaceContainerLow,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: scheme.outlineVariant),
+          ),
+          suffixIcon: Icon(Icons.calendar_today_outlined, color: scheme.onSurfaceVariant),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        child: Text(
+          display,
+          style: text.bodyLarge?.copyWith(
+            color: _fechaNacimiento != null ? scheme.onSurface : scheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoTile(IconData icon, String label, String value, ColorScheme scheme) {
+    return ListTile(
+      leading: Icon(icon, color: scheme.onSurfaceVariant),
+      title: Text(label),
+      subtitle: Text(
+        value,
+        style: TextStyle(color: scheme.onSurface),
+      ),
+    );
+  }
+
+  Widget _divider(ColorScheme scheme) {
+    return Divider(height: 1, indent: 16, color: scheme.outlineVariant.withValues(alpha: 0.3));
+  }
+
   String _formatDate(DateTime date) {
     final d = date.toLocal();
     return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _fechaNacimiento ?? DateTime(2000),
+      firstDate: DateTime(1940),
+      lastDate: now,
+    );
+    if (picked != null) {
+      setState(() => _fechaNacimiento = picked);
+    }
+  }
+
+  Future<void> _saveProfile(WidgetRef ref) async {
+    final nombre = _nombreCtrl.text.trim();
+    final apellidoPaterno = _apellidoPaternoCtrl.text.trim();
+    final apellidoMaterno = _apellidoMaternoCtrl.text.trim();
+    final telefono = _telefonoCtrl.text.trim();
+
+    if (nombre.isEmpty || apellidoPaterno.isEmpty || telefono.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nombre, apellido paterno y telefono son obligatorios')),
+      );
+      return;
+    }
+
+    final ok = await ref.read(profileViewModelProvider.notifier).updateProfile(
+      nombre: nombre,
+      apellidoPaterno: apellidoPaterno,
+      apellidoMaterno: apellidoMaterno.isEmpty ? '' : apellidoMaterno,
+      fechaNacimiento: _fechaNacimiento != null
+          ? '${_fechaNacimiento!.year}-${_fechaNacimiento!.month.toString().padLeft(2, '0')}-${_fechaNacimiento!.day.toString().padLeft(2, '0')}'
+          : null,
+      telefono: telefono,
+    );
+
+    if (ok && mounted) {
+      final freshUser = ref.read(profileViewModelProvider).user;
+      if (freshUser != null) _initControllers(freshUser);
+      setState(() => _isEditing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Perfil actualizado')),
+      );
+    }
   }
 
   Future<void> _pickAndUploadPhoto(BuildContext context, WidgetRef ref) async {
@@ -219,7 +546,7 @@ class _ProfileContent extends ConsumerWidget {
     if (contentType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Formato no permitido. Usá JPG, PNG o WebP.'),
+          content: Text('Formato no permitido. Usa JPG, PNG o WebP.'),
         ),
       );
       return;
@@ -229,7 +556,11 @@ class _ProfileContent extends ConsumerWidget {
     if (!context.mounted) return;
 
     final vm = ref.read(profileViewModelProvider.notifier);
-    final ok = await vm.uploadNewPhoto(bytes: bytes, contentType: contentType);
+    final ok = await vm.uploadNewPhoto(
+      bytes: bytes,
+      contentType: contentType,
+      fileName: file.name,
+    );
     if (!context.mounted) return;
     final state = ref.read(profileViewModelProvider);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -259,7 +590,7 @@ class _ProfileContent extends ConsumerWidget {
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Elegir de la galería'),
+              title: const Text('Elegir de la galeria'),
               onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
             ),
             const SizedBox(height: 8),
@@ -288,8 +619,8 @@ class _ProfileContent extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar cuenta'),
         content: const Text(
-          'Tu cuenta será eliminada y tu foto se borrará de '
-          'forma definitiva. ¿Querés continuar?',
+          'Tu cuenta sera eliminada y tu foto se borrara de '
+          'forma definitiva. Quieres continuar?',
         ),
         actions: [
           TextButton(
@@ -318,14 +649,18 @@ class _ProfileContent extends ConsumerWidget {
 
 class _Avatar extends StatelessWidget {
   const _Avatar({
+    required this.userId,
     required this.url,
     required this.initials,
     required this.isUploading,
+    required this.apiClient,
   });
 
+  final int userId;
   final String? url;
   final String initials;
   final bool isUploading;
+  final ApiClient apiClient;
 
   @override
   Widget build(BuildContext context) {
@@ -346,8 +681,11 @@ class _Avatar extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               )
-            : Image.network(
-                url!,
+            : Image(
+                image: AuthImageProvider(
+                  userId: userId,
+                  apiClient: apiClient,
+                ),
                 width: 96,
                 height: 96,
                 fit: BoxFit.cover,
@@ -361,18 +699,14 @@ class _Avatar extends StatelessWidget {
                     ),
                   );
                 },
-                loadingBuilder: (ctx, child, progress) {
-                  if (progress == null) return child;
+                frameBuilder: (ctx, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded || frame != null) return child;
                   return Center(
                     child: SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        value: progress.expectedTotalBytes != null
-                            ? progress.cumulativeBytesLoaded /
-                                progress.expectedTotalBytes!
-                            : null,
                         color: scheme.onSecondaryContainer,
                       ),
                     ),

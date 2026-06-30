@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/jala_theme.dart';
+
 class JalaFloatingCircleButton extends StatelessWidget {
   const JalaFloatingCircleButton({
     super.key,
     required this.icon,
     required this.onTap,
-    this.iconColor = const Color(0xFF1A1410),
+    this.iconColor,
     this.iconSize = 26,
     this.size = 48,
   });
 
   final IconData icon;
   final VoidCallback onTap;
-  final Color iconColor;
+  final Color? iconColor;
   final double iconSize;
   final double size;
 
@@ -25,11 +27,11 @@ class JalaFloatingCircleButton extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.brand.surfaceLight,
           borderRadius: BorderRadius.circular(size / 2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
+              color: context.colors.onSurface.withValues(alpha: 0.12),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -38,7 +40,7 @@ class JalaFloatingCircleButton extends StatelessWidget {
         child: Icon(
           icon,
           size: iconSize,
-          color: iconColor,
+          color: iconColor ?? context.colors.onSurface,
         ),
       ),
     );

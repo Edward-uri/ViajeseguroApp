@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../routes/app_routes.dart';
+import '../../../../shared/widgets/widgets.dart';
+import '../../../../theme/jala_theme.dart';
 import '../../domain/entities/municipio.dart';
 import '../provider/register_viewmodel.dart';
 import 'register_widgets.dart';
@@ -17,6 +20,9 @@ class FormAdditionalStep extends ConsumerStatefulWidget {
 }
 
 class _FormAdditionalStepState extends ConsumerState<FormAdditionalStep> {
+  bool _passwordVisible = false;
+  bool _confirmPasswordVisible = false;
+
   @override
   void initState() {
     super.initState();
@@ -33,87 +39,142 @@ class _FormAdditionalStepState extends ConsumerState<FormAdditionalStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Información adicional',
-          style: text.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurface,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 100),
+          child: Text(
+            'Información adicional',
+            style: text.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        Text(
-          'Necesitamos algunos datos más',
-          style: text.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 180),
+          child: Text(
+            'Necesitamos algunos datos más',
+            style: text.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ),
         const SizedBox(height: 16),
-        LabeledTextField(
-          label: 'Escribe tu numero de celular',
-          enabled: !widget.state.isLoading,
-          keyboardType: TextInputType.phone,
-          hintText: 'Escribe tu numero de celular',
-          maxLength: 12,
-          onChanged: widget.vm.setTelefono,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 260),
+          child: LabeledTextField(
+            label: 'Numero de celular',
+            enabled: !widget.state.isLoading,
+            keyboardType: TextInputType.phone,
+            hintText: '10 digitos',
+            maxLength: 10,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
+            onChanged: widget.vm.setTelefono,
+          ),
         ),
         const SizedBox(height: 16),
-        SexoDropdown(
-          enabled: !widget.state.isLoading,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 340),
+          child: SexoDropdown(
+            enabled: !widget.state.isLoading,
+          ),
         ),
         const SizedBox(height: 16),
-        FechaNacimientoField(
-          enabled: !widget.state.isLoading,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 420),
+          child: FechaNacimientoField(
+            enabled: !widget.state.isLoading,
+          ),
         ),
         const SizedBox(height: 16),
-        _MunicipioDropdown(
-          enabled: !widget.state.isLoading,
-          municipios: widget.state.municipios,
-          loading: widget.state.municipiosLoading,
-          loaded: widget.state.municipiosLoaded,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 500),
+          child: _MunicipioDropdown(
+            enabled: !widget.state.isLoading,
+            municipios: widget.state.municipios,
+            loading: widget.state.municipiosLoading,
+            loaded: widget.state.municipiosLoaded,
+          ),
         ),
         const SizedBox(height: 24),
-        Divider(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 560),
+          child: Divider(color: scheme.outlineVariant.withValues(alpha: 0.3)),
+        ),
         const SizedBox(height: 24),
-        LabeledTextField(
-          label: 'Contrasena',
-          enabled: !widget.state.isLoading,
-          obscureText: true,
-          hintText: 'Minimo 8 caracteres, una mayuscula, un numero',
-          onChanged: widget.vm.setContrasena,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 620),
+          child: LabeledTextField(
+            label: 'Contrasena',
+            enabled: !widget.state.isLoading,
+            obscureText: !_passwordVisible,
+            hintText: 'Minimo 8 caracteres, una mayuscula, un numero',
+            onChanged: widget.vm.setContrasena,
+            suffixIcon: IconButton(
+              icon: Icon(
+                _passwordVisible
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+              onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
+            ),
+          ),
         ),
         const SizedBox(height: 8),
-        _PasswordRequirements(vm: widget.vm),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 680),
+          child: _PasswordRequirements(vm: widget.vm),
+        ),
         const SizedBox(height: 16),
-        LabeledTextField(
-          label: 'Confirmar contrasena',
-          enabled: !widget.state.isLoading,
-          obscureText: true,
-          hintText: 'Repite tu contrasena',
-          errorText: widget.vm.confirmarContrasena.isNotEmpty && !widget.vm.passwordsMatch
-              ? 'Las contrasenas no coinciden'
-              : null,
-          onChanged: widget.vm.setConfirmarContrasena,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 740),
+          child: LabeledTextField(
+            label: 'Confirmar contrasena',
+            enabled: !widget.state.isLoading,
+            obscureText: !_confirmPasswordVisible,
+            hintText: 'Repite tu contrasena',
+            errorText: widget.vm.confirmarContrasena.isNotEmpty && !widget.vm.passwordsMatch
+                ? 'Las contrasenas no coinciden'
+                : null,
+            onChanged: widget.vm.setConfirmarContrasena,
+            suffixIcon: IconButton(
+              icon: Icon(
+                _confirmPasswordVisible
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined,
+              ),
+              onPressed: () => setState(() => _confirmPasswordVisible = !_confirmPasswordVisible),
+            ),
+          ),
         ),
         if (widget.state.errorMessage != null) ...[
           const SizedBox(height: 12),
-          ErrorBanner(
-            message: widget.state.errorMessage!,
-            onDismiss: widget.vm.clearError,
+          FadeSlideIn(
+            child: ErrorBanner(
+              message: widget.state.errorMessage!,
+              onDismiss: widget.vm.clearError,
+            ),
           ),
         ],
         const SizedBox(height: 24),
-        FilledButton(
-          onPressed: widget.state.canSubmit ? () => _onSubmit(context, ref) : null,
-          child: widget.state.isLoading
-              ? SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: scheme.onPrimary,
-                  ),
-                )
-              : const Text('Crear cuenta'),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 800),
+          child: FilledButton(
+            onPressed: widget.state.canSubmit ? () => _onSubmit(context, ref) : null,
+            child: widget.state.isLoading
+                ? SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.onPrimary,
+                    ),
+                  )
+                : const Text('Crear cuenta'),
+          ),
         ),
       ],
     );
@@ -137,28 +198,63 @@ class _PasswordRequirements extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (vm.contrasena.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _RequirementRow(
-          label: 'Minimo 8 caracteres',
-          met: vm.passwordHasMinLength,
-        ),
-        _RequirementRow(
-          label: 'Una mayuscula (A-Z)',
-          met: vm.passwordHasUpperCase,
-        ),
-        _RequirementRow(
-          label: 'Una minuscula (a-z)',
-          met: vm.passwordHasLowerCase,
-        ),
-        _RequirementRow(
-          label: 'Un numero (0-9)',
-          met: vm.passwordHasDigit,
-        ),
-      ],
+    final requirements = [
+      (label: 'Minimo 8 caracteres', met: vm.passwordHasMinLength),
+      (label: 'Una mayuscula (A-Z)', met: vm.passwordHasUpperCase),
+      (label: 'Una minuscula (a-z)', met: vm.passwordHasLowerCase),
+      (label: 'Un numero (0-9)', met: vm.passwordHasDigit),
+    ];
+
+    final metCount = requirements.where((r) => r.met).length;
+    final allMet = metCount == requirements.length;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOutCubic,
+      child: vm.contrasena.isEmpty
+          ? const SizedBox.shrink()
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        value: metCount / requirements.length,
+                        strokeWidth: 2,
+                        backgroundColor: scheme.outlineVariant.withValues(alpha: 0.3),
+                        color: allMet ? context.brand.success : scheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      allMet ? 'Contrasena segura' : '$metCount/${requirements.length} requisitos',
+                      style: text.labelSmall?.copyWith(
+                        color: allMet ? context.brand.success : scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ...requirements.map((r) => _RequirementRow(
+                  label: r.label,
+                  met: r.met,
+                )),
+                if (vm.confirmarContrasena.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  _RequirementRow(
+                    label: 'Las contrasenas coinciden',
+                    met: vm.passwordsMatch,
+                  ),
+                ],
+              ],
+            ),
     );
   }
 }
@@ -171,7 +267,7 @@ class _RequirementRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = met ? const Color(0xFF1E8E5A) : const Color(0xFF6B6661);
+    final color = met ? context.brand.success : context.brand.greyDark;
     final icon = met ? Icons.check_circle : Icons.radio_button_unchecked;
 
     return Padding(
@@ -331,7 +427,7 @@ class _MunicipioDropdownState extends ConsumerState<_MunicipioDropdown> with Sin
             margin: const EdgeInsets.only(top: 4),
             constraints: const BoxConstraints(maxHeight: 200),
             decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest,
+              color: scheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: scheme.outlineVariant),
               boxShadow: [

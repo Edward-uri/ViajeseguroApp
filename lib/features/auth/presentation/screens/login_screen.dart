@@ -5,7 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/widgets/bubble_loader.dart';
 import '../../../../routes/app_routes.dart';
-import '../../../../shared/widgets/jala_alert_banner.dart';
+import '../../../../shared/widgets/widgets.dart';
 import '../provider/login_viewmodel.dart';
 
 class LoginScreen extends ConsumerWidget {
@@ -112,13 +112,20 @@ class _LoginViewState extends ConsumerState<_LoginView> with WidgetsBindingObser
   }
 }
 
-class _LoginContent extends ConsumerWidget {
+class _LoginContent extends ConsumerStatefulWidget {
   const _LoginContent({required this.onSubmit});
 
   final Future<void> Function(BuildContext context) onSubmit;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LoginContent> createState() => _LoginContentState();
+}
+
+class _LoginContentState extends ConsumerState<_LoginContent> {
+  bool _passwordVisible = false;
+
+  @override
+  Widget build(BuildContext context) {
     final vm = ref.watch(loginViewModelProvider);
     final notifier = ref.read(loginViewModelProvider.notifier);
     final scheme = Theme.of(context).colorScheme;
@@ -135,84 +142,117 @@ class _LoginContent extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 24),
-                  Center(
-                    child: SvgPicture.asset(
-                      'lib/shared/icons/Mototaxi Línea.svg',
-                      width: 160,
-                      height: 120,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 100),
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'lib/shared/icons/Mototaxi Línea.svg',
+                        width: 160,
+                        height: 120,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Jala',
-                    textAlign: TextAlign.center,
-                    style: text.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 200),
+                    child: Text(
+                      'Jala',
+                      textAlign: TextAlign.center,
+                      style: text.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Jalate con un mototaxi',
-                    textAlign: TextAlign.center,
-                    style: text.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 280),
+                    child: Text(
+                      'Jalate con un mototaxi',
+                      textAlign: TextAlign.center,
+                      style: text.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 32),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    onChanged: notifier.setCorreo,
-                    decoration: const InputDecoration(
-                      labelText: 'Correo electronico',
-                      prefixIcon: Icon(Icons.alternate_email),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 360),
+                    child: TextField(
+                      enabled: !vm.isLoading,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      onChanged: notifier.setCorreo,
+                      decoration: const InputDecoration(
+                        labelText: 'Correo electronico',
+                        prefixIcon: Icon(Icons.alternate_email),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    enabled: !vm.isLoading,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    onChanged: notifier.setContrasena,
-                    onSubmitted: (_) => onSubmit(context),
-                    decoration: const InputDecoration(
-                      labelText: 'Contrasena',
-                      prefixIcon: Icon(Icons.lock_outline),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 440),
+                    child: TextField(
+                      enabled: !vm.isLoading,
+                      obscureText: !_passwordVisible,
+                      textInputAction: TextInputAction.done,
+                      onChanged: notifier.setContrasena,
+                      onSubmitted: (_) => widget.onSubmit(context),
+                      decoration: InputDecoration(
+                        labelText: 'Contrasena',
+                        prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _passwordVisible
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                          onPressed: () {
+                            setState(() => _passwordVisible = !_passwordVisible);
+                          },
+                        ),
+                      ),
                     ),
                   ),
                   if (vm.errorMessage != null) ...[
                     const SizedBox(height: 16),
-                    JalaAlertBanner(
-                      message: vm.errorMessage!,
-                      onDismiss: () =>
-                          ref.read(loginViewModelProvider.notifier).clearError(),
+                    FadeSlideIn(
+                      child: JalaAlertBanner(
+                        message: vm.errorMessage!,
+                        onDismiss: () =>
+                            ref.read(loginViewModelProvider.notifier).clearError(),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: vm.canSubmit ? () => onSubmit(context) : null,
-                    child: vm.isLoading
-                        ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.4,
-                              color: scheme.onPrimary,
-                            ),
-                          )
-                        : const Text('Iniciar sesion'),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 520),
+                    child: FilledButton(
+                      onPressed: vm.canSubmit ? () => widget.onSubmit(context) : null,
+                      child: vm.isLoading
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: scheme.onPrimary,
+                              ),
+                            )
+                          : const Text('Iniciar sesion'),
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: vm.isLoading
-                        ? null
-                        : () {
-                            ref.read(loginViewModelProvider.notifier).clearError();
-                            Navigator.of(context).pushNamed(AppRoutes.register);
-                          },
-                    child: const Text('¿No tienes cuenta? Crear una'),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 600),
+                    child: TextButton(
+                      onPressed: vm.isLoading
+                          ? null
+                          : () {
+                              ref.read(loginViewModelProvider.notifier).clearError();
+                              Navigator.of(context).pushNamed(AppRoutes.register);
+                            },
+                      child: const Text('¿No tienes cuenta? Crear una'),
+                    ),
                   ),
                 ],
               ),
@@ -242,35 +282,46 @@ class _UsbDebugBlock extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.adb_outlined,
-                    size: 52,
-                    color: scheme.error,
+                  FadeSlideIn(
+                    child: Icon(
+                      Icons.adb_outlined,
+                      size: 52,
+                      color: scheme.error,
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    'Seguridad Comprometida',
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 150),
+                    child: Text(
+                      'Seguridad Comprometida',
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Se ha detectado la depuracion USB activa. Por politicas de seguridad, '
-                    'debes desactivar esta opcion en los ajustes de desarrollador. '
-                    'La aplicacion se cerrara en 5 segundos.',
-                    style: text.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 300),
+                    child: Text(
+                      'Se ha detectado la depuracion USB activa. Por politicas de seguridad, '
+                      'debes desactivar esta opcion en los ajustes de desarrollador. '
+                      'La aplicacion se cerrara en 5 segundos.',
+                      style: text.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: () => SystemNavigator.pop(),
-                    icon: const Icon(Icons.exit_to_app_outlined),
-                    label: const Text('Salir'),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 450),
+                    child: FilledButton.icon(
+                      onPressed: () => SystemNavigator.pop(),
+                      icon: const Icon(Icons.exit_to_app_outlined),
+                      label: const Text('Salir'),
+                    ),
                   ),
                 ],
               ),
@@ -300,34 +351,45 @@ class _MockLocationBlock extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.location_off_outlined,
-                    size: 52,
-                    color: scheme.error,
+                  FadeSlideIn(
+                    child: Icon(
+                      Icons.location_off_outlined,
+                      size: 52,
+                      color: scheme.error,
+                    ),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    'Ubicacion simulada detectada',
-                    style: text.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 150),
+                    child: Text(
+                      'Ubicacion simulada detectada',
+                      style: text.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    'Desactiva el Fake GPS o elimina la app de ubicacion '
-                    'simulada. La aplicacion se cerrara en 5 segundos.',
-                    style: text.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 300),
+                    child: Text(
+                      'Desactiva el Fake GPS o elimina la app de ubicacion '
+                      'simulada. La aplicacion se cerrara en 5 segundos.',
+                      style: text.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: () => SystemNavigator.pop(),
-                    icon: const Icon(Icons.exit_to_app_outlined),
-                    label: const Text('Salir'),
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 450),
+                    child: FilledButton.icon(
+                      onPressed: () => SystemNavigator.pop(),
+                      icon: const Icon(Icons.exit_to_app_outlined),
+                      label: const Text('Salir'),
+                    ),
                   ),
                 ],
               ),

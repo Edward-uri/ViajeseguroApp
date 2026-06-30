@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
-import '../../theme/theme.dart';
+import '../../theme/jala_theme.dart';
 
+/// Pin minimalista para seleccionar ubicación en el mapa.
+/// Círculo con borde + punto central, con sombra suave.
 class JalaPinMarker extends StatelessWidget {
   const JalaPinMarker({
     super.key,
-    this.pinColor = Colors.white,
-    this.accentColor = const Color(0xFFFF8F00),
+    this.color = JalaBrand.amber,
+    this.size = 40,
   });
 
-  final Color pinColor;
-  final Color accentColor;
+  final Color color;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -20,73 +22,57 @@ class JalaPinMarker extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.only(bottom: 24),
         child: CustomPaint(
-          size: const Size(48, 62),
-          painter: _PinPainter(pinColor: pinColor, accentColor: accentColor),
+          size: Size(size, size),
+          painter: _MapPinPainter(color: color),
         ),
       ),
     );
   }
 }
 
-class _PinPainter extends CustomPainter {
-  _PinPainter({required this.pinColor, required this.accentColor});
+class _MapPinPainter extends CustomPainter {
+  _MapPinPainter({required this.color});
 
-  final Color pinColor;
-  final Color accentColor;
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path();
-    path.moveTo(size.width / 2, size.height);
-    path.cubicTo(
-      size.width / 2,
-      size.height * 0.65,
-      0,
-      size.height * 0.45,
-      0,
-      size.height * 0.3,
-    );
-    path.arcTo(
-      Rect.fromCircle(
-        center: Offset(size.width / 2, size.height * 0.3),
-        radius: size.width / 2,
-      ),
-      3.14159,
-      3.14159,
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    // Sombra suave
+    canvas.drawShadow(
+      Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
+      Colors.black.withValues(alpha: 0.2),
+      6.0,
       false,
     );
-    path.cubicTo(
-      size.width,
-      size.height * 0.45,
-      size.width / 2,
-      size.height * 0.65,
-      size.width / 2,
-      size.height,
-    );
-    path.close();
 
-    canvas.drawShadow(path, Colors.black.withValues(alpha: 0.25), 4.0, false);
-
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = pinColor
-        ..style = PaintingStyle.fill,
-    );
-
+    // Círculo exterior blanco
     canvas.drawCircle(
-      Offset(size.width / 2, size.height * 0.3),
-      size.width * 0.2,
-      Paint()
-        ..color = accentColor
-        ..style = PaintingStyle.fill,
-    );
-
-    canvas.drawCircle(
-      Offset(size.width / 2, size.height * 0.3),
-      size.width * 0.1,
+      center,
+      radius,
       Paint()
         ..color = Colors.white
+        ..style = PaintingStyle.fill,
+    );
+
+    // Borde de color
+    canvas.drawCircle(
+      center,
+      radius - 2,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3,
+    );
+
+    // Punto central de color
+    canvas.drawCircle(
+      center,
+      radius * 0.35,
+      Paint()
+        ..color = color
         ..style = PaintingStyle.fill,
     );
   }
@@ -144,6 +130,7 @@ class JalaMapView extends StatefulWidget {
     this.initialZoom = 2.0,
     this.showLocationMarker = false,
     this.showPinMarker = false,
+    this.pinMarkerColor = JalaBrand.amber,
     this.showCurrentLocationPin = true,
     this.onMapIdle,
     this.onCameraChanged,
@@ -156,6 +143,7 @@ class JalaMapView extends StatefulWidget {
   final double initialZoom;
   final bool showLocationMarker;
   final bool showPinMarker;
+  final Color pinMarkerColor;
   final bool showCurrentLocationPin;
   final void Function(CameraChangedEventData)? onCameraChanged;
   final void Function(MapIdleEventData)? onMapIdle;
@@ -165,7 +153,8 @@ class JalaMapView extends StatefulWidget {
   State<JalaMapView> createState() => _JalaMapViewState();
 }
 
-class _JalaMapViewState extends State<JalaMapView> {
+class _JalaMapViewState extends State<JalaMapView>
+    with WidgetsBindingObserver {
   MapboxMap? _mapboxMap;
   CircleAnnotationManager? _circleManager;
   geo.Position? _currentPosition;
@@ -174,10 +163,40 @@ class _JalaMapViewState extends State<JalaMapView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.autoLocate &&
         widget.initialLatitude == null &&
         widget.initialLongitude == null) {
       _resolveCurrentLocation();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// When the app comes back from background the native GL surface may have
+  /// been destroyed by Android.  A zero-duration flyTo with the last known
+  /// position forces the Mapbox renderer to re-acquire the surface.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _mapboxMap != null) {
+      final pos = _currentPosition;
+      if (pos != null) {
+        try {
+          _mapboxMap!.flyTo(
+            CameraOptions(
+              center: Point(
+                coordinates: Position(pos.longitude, pos.latitude),
+              ),
+              zoom: 16.0,
+            ),
+            MapAnimationOptions(duration: 0, startDelay: 0),
+          );
+        } catch (_) {}
+      }
     }
   }
 
@@ -319,7 +338,7 @@ class _JalaMapViewState extends State<JalaMapView> {
         if (widget.showPinMarker)
           Positioned.fill(
             child: IgnorePointer(
-              child: JalaPinMarker(),
+              child: JalaPinMarker(color: widget.pinMarkerColor),
             ),
           ),
       ],

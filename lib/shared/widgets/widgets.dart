@@ -1,3 +1,4 @@
+export 'fade_slide_in.dart';
 export 'jala_alert_banner.dart';
 export 'jala_back_button.dart';
 export 'jala_bottom_nav_bar.dart';

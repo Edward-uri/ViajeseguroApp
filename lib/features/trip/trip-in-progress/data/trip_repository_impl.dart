@@ -1,3 +1,4 @@
+import '../domain/entities/estimacion_viaje.dart';
 import '../domain/entities/trip.dart';
 import '../domain/repositories/trip_repository.dart';
 import '../../trip-searching/domain/entities/trip_location.dart';
@@ -9,10 +10,32 @@ class TripRepositoryImpl implements TripRepository {
   final TripApi _tripApi;
 
   @override
+  Future<EstimacionViaje> estimarViaje({
+    required int idMunicipio,
+    required TripLocation origin,
+    required TripLocation destination,
+    int personas = 1,
+  }) async {
+    final response = await _tripApi.estimarViaje(
+      idMunicipio: idMunicipio,
+      originLat: origin.latitude,
+      originLng: origin.longitude,
+      originAddress: origin.address,
+      destinationLat: destination.latitude,
+      destinationLng: destination.longitude,
+      destinationAddress: destination.address,
+      personas: personas,
+    );
+    return EstimacionViaje.fromJson(response);
+  }
+
+  @override
   Future<Trip> createTrip({
     required int idMunicipio,
     required TripLocation origin,
     required TripLocation destination,
+    int personas = 1,
+    int? idZonaDestino,
   }) async {
     final response = await _tripApi.createTrip(
       idMunicipio: idMunicipio,
@@ -22,6 +45,8 @@ class TripRepositoryImpl implements TripRepository {
       destinationLat: destination.latitude,
       destinationLng: destination.longitude,
       destinationAddress: destination.address,
+      personas: personas,
+      idZonaDestino: idZonaDestino,
     );
 
     return Trip.fromJson(response);
@@ -34,7 +59,14 @@ class TripRepositoryImpl implements TripRepository {
   }
 
   @override
-  Future<void> cancelTrip(String tripId) async {
-    await _tripApi.cancelTrip(tripId);
+  Future<Trip?> getActiveTrip() async {
+    final response = await _tripApi.getActiveTrip();
+    if (response == null) return null;
+    return Trip.fromJson(response);
+  }
+
+  @override
+  Future<void> cancelTrip(String tripId, {String? motivo}) async {
+    await _tripApi.cancelTrip(tripId, motivo: motivo);
   }
 }

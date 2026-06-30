@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/widgets/jala_alert_banner.dart';
@@ -15,6 +16,8 @@ class LabeledTextField extends StatelessWidget {
     this.maxLength,
     this.obscureText = false,
     this.errorText,
+    this.suffixIcon,
+    this.inputFormatters,
   });
 
   final String label;
@@ -25,6 +28,8 @@ class LabeledTextField extends StatelessWidget {
   final int? maxLength;
   final bool obscureText;
   final String? errorText;
+  final Widget? suffixIcon;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +53,7 @@ class LabeledTextField extends StatelessWidget {
           maxLength: maxLength,
           obscureText: obscureText,
           onChanged: onChanged,
+          inputFormatters: inputFormatters,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -60,6 +66,7 @@ class LabeledTextField extends StatelessWidget {
             ),
             counterText: maxLength != null ? '' : null,
             errorText: errorText,
+            suffixIcon: suffixIcon,
           ),
         ),
       ],
@@ -191,7 +198,7 @@ class _SexoDropdownState extends ConsumerState<SexoDropdown> with SingleTickerPr
           child: Container(
             margin: const EdgeInsets.only(top: 4),
             decoration: BoxDecoration(
-              color: scheme.surfaceContainerLowest,
+              color: scheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: scheme.outlineVariant),
               boxShadow: [

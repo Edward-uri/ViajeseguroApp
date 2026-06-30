@@ -19,6 +19,41 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
+  Future<User> updateProfile({
+    String? nombre,
+    String? apellidoPaterno,
+    String? apellidoMaterno,
+    int? idSexo,
+    String? fechaNacimiento,
+    String? telefono,
+  }) async {
+    final body = <String, dynamic>{
+      if (nombre != null) 'nombre': nombre,
+      if (apellidoPaterno != null) 'apellidoPaterno': apellidoPaterno,
+      if (apellidoMaterno != null) 'apellidoMaterno': apellidoMaterno,
+      if (idSexo != null) 'idSexo': idSexo,
+      if (fechaNacimiento != null) 'fechaNacimiento': fechaNacimiento,
+      if (telefono != null) 'telefono': telefono,
+    };
+    final response = await _api.updateProfile(body);
+    return UserMapper.fromJson(_unwrapData(response));
+  }
+
+  @override
+  Future<User> uploadPhotoDirect({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async {
+    final response = await _api.uploadPhotoDirect(
+      bytes: bytes,
+      fileName: fileName,
+      contentType: contentType,
+    );
+    return UserMapper.fromJson(_unwrapData(response));
+  }
+
+  @override
   Future<ProfilePhotoUploadTicket> requestPhotoUpload({
     required String contentType,
   }) async {

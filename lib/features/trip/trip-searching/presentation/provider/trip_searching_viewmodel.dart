@@ -7,6 +7,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../../../../core/auth/current_user_provider.dart';
 import '../../../../../core/http/api_exception.dart';
 import '../../../trip-in-progress/di/trip_in_progress_module.dart';
+import '../../../trip-in-progress/domain/entities/estimacion_viaje.dart';
 import '../../../trip-in-progress/domain/entities/trip.dart';
 import '../../../trip-in-progress/domain/repositories/trip_repository.dart';
 import '../../di/trip_searching_module.dart';
@@ -193,6 +194,11 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
     ];
   }
 
+  void setNumPersonas(int n) {
+    if (n < 1 || n > 3) return;
+    state = state.copyWith(numPersonas: n, estimacion: null);
+  }
+
   Future<void> requestFare() async {
     if (state.origin == null || state.destination == null) return;
 
@@ -200,13 +206,24 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
 
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
-      final trip = await _tripRepository.createTrip(
+      // Verificar si ya hay un viaje activo
+      final activeTrip = await _tripRepository.getActiveTrip();
+      if (activeTrip != null) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMessage: 'Ya tienes un viaje activo. Cancélalo primero desde el historial.',
+        );
+        return;
+      }
+
+      final estimacion = await _tripRepository.estimarViaje(
         idMunicipio: idMunicipio,
         origin: state.origin!,
         destination: state.destination!,
+        personas: state.numPersonas,
       );
       state = state.copyWith(
-        trip: trip,
+        estimacion: estimacion,
         isLoading: false,
         step: TripSearchingStep.fareShown,
       );
@@ -218,8 +235,39 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
     } catch (_) {
       state = state.copyWith(
         isLoading: false,
+        errorMessage: 'Error al estimar viaje',
+      );
+    }
+  }
+
+  Future<Trip?> confirmFare() async {
+    if (state.origin == null || state.destination == null) return null;
+
+    final idMunicipio = _currentUserNotifier.user?.idMunicipio ?? 1;
+
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final trip = await _tripRepository.createTrip(
+        idMunicipio: idMunicipio,
+        origin: state.origin!,
+        destination: state.destination!,
+        personas: state.numPersonas,
+        idZonaDestino: state.estimacion?.idZonaDestino,
+      );
+      state = const TripSearchingViewModelState();
+      return trip;
+    } on ApiException catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: e.message,
+      );
+      return null;
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
         errorMessage: 'Error al crear viaje',
       );
+      return null;
     }
   }
 
@@ -231,21 +279,11 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
   }
 
   Future<void> rejectFare() async {
-    final trip = state.trip;
-    if (trip != null) {
-      try {
-        await _tripRepository.cancelTrip(trip.id);
-      } catch (_) {}
-    }
     state = state.copyWith(
-      trip: null,
+      estimacion: null,
       step: TripSearchingStep.readyToConfirm,
       isLoading: false,
     );
-  }
-
-  Future<Trip?> confirmFare() async {
-    return acceptFare();
   }
 
   @override
@@ -256,12 +294,16 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
 }
 
 class TripSearchingViewModelState extends Equatable {
+  static const _sentinel = Object();
+
   const TripSearchingViewModelState({
     this.step = TripSearchingStep.selectingOrigin,
     this.activeInput = LocationInputMode.origin,
     this.origin,
     this.destination,
     this.trip,
+    this.estimacion,
+    this.numPersonas = 1,
     this.searchQuery = '',
     this.searchResults = const [],
     this.isSearching = false,
@@ -279,6 +321,8 @@ class TripSearchingViewModelState extends Equatable {
   final TripLocation? origin;
   final TripLocation? destination;
   final Trip? trip;
+  final EstimacionViaje? estimacion;
+  final int numPersonas;
   final String searchQuery;
   final List<TripLocation> searchResults;
   final bool isSearching;
@@ -301,12 +345,14 @@ class TripSearchingViewModelState extends Equatable {
     TripLocation? origin,
     TripLocation? destination,
     Trip? trip,
+    EstimacionViaje? estimacion,
+    int? numPersonas,
     String? searchQuery,
     List<TripLocation>? searchResults,
     bool? isSearching,
     String? searchError,
     bool? isLoading,
-    String? errorMessage,
+    Object? errorMessage = _sentinel,
     bool? isPickingOnMap,
     double? pendingMapLat,
     double? pendingMapLng,
@@ -318,12 +364,14 @@ class TripSearchingViewModelState extends Equatable {
       origin: origin ?? this.origin,
       destination: destination ?? this.destination,
       trip: trip ?? this.trip,
+      estimacion: estimacion ?? this.estimacion,
+      numPersonas: numPersonas ?? this.numPersonas,
       searchQuery: searchQuery ?? this.searchQuery,
       searchResults: searchResults ?? this.searchResults,
       isSearching: isSearching ?? this.isSearching,
       searchError: searchError ?? this.searchError,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: identical(errorMessage, _sentinel) ? this.errorMessage : errorMessage as String?,
       isPickingOnMap: isPickingOnMap ?? this.isPickingOnMap,
       pendingMapLat: pendingMapLat ?? this.pendingMapLat,
       pendingMapLng: pendingMapLng ?? this.pendingMapLng,
@@ -338,6 +386,8 @@ class TripSearchingViewModelState extends Equatable {
         origin,
         destination,
         trip,
+        estimacion,
+        numPersonas,
         searchQuery,
         searchResults,
         isSearching,

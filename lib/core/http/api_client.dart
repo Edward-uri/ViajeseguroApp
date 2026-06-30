@@ -26,6 +26,10 @@ class ApiClient {
 
   bool _isRefreshing = false;
 
+  /// Último token leído del storage (cache para acceso síncrono, ej: SocketService).
+  String? _cachedToken;
+  String? get currentToken => _cachedToken;
+
   Future<Map<String, dynamic>> get(String path, {bool auth = true}) {
     return _sendRequest(
       (headers) => _client.get(_uri(path), headers: headers),
@@ -45,7 +49,7 @@ class ApiClient {
         body: body == null ? null : jsonEncode(body),
       ),
       auth: auth,
-      hasBody: true,
+      hasBody: body != null,
     );
   }
 
@@ -61,7 +65,7 @@ class ApiClient {
         body: body == null ? null : jsonEncode(body),
       ),
       auth: auth,
-      hasBody: true,
+      hasBody: body != null,
     );
   }
 
@@ -99,7 +103,10 @@ class ApiClient {
     };
     if (auth) {
       final token = await _authStorage.readToken();
-      if (token != null) headers['Authorization'] = 'Bearer $token';
+      if (token != null) {
+        _cachedToken = token;
+        headers['Authorization'] = 'Bearer $token';
+      }
     }
     return headers;
   }

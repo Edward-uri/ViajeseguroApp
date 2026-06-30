@@ -47,6 +47,8 @@ class TripHistoryViewModel extends StateNotifier<TripHistoryViewModelState> {
 }
 
 class TripHistoryViewModelState extends Equatable {
+  static const _sentinel = Object();
+
   const TripHistoryViewModelState({
     this.items = const [],
     this.isLoading = false,
@@ -65,13 +67,13 @@ class TripHistoryViewModelState extends Equatable {
   TripHistoryViewModelState copyWith({
     List<TripHistoryItem>? items,
     bool? isLoading,
-    String? errorMessage,
+    Object? errorMessage = _sentinel,
     int? totalEsteMes,
   }) {
     return TripHistoryViewModelState(
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: identical(errorMessage, _sentinel) ? this.errorMessage : errorMessage as String?,
       totalEsteMes: totalEsteMes ?? this.totalEsteMes,
     );
   }

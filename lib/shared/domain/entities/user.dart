@@ -12,6 +12,8 @@ class User {
     this.idMunicipio,
     this.fotoPerfilUrl,
     this.fechaRegistro,
+    this.idSexo,
+    this.fechaNacimiento,
   });
 
   final int idUsuario;
@@ -26,6 +28,8 @@ class User {
   final int? idMunicipio;
   final String? fotoPerfilUrl;
   final DateTime? fechaRegistro;
+  final int? idSexo;
+  final DateTime? fechaNacimiento;
 
   String get nombreUsuario => correoElectronico ?? telefono;
 
@@ -64,6 +68,8 @@ class User {
     String? nombre,
     String? apellidoPaterno,
     String? apellidoMaterno,
+    int? idSexo,
+    DateTime? fechaNacimiento,
   }) {
     return User(
       idUsuario: idUsuario,
@@ -78,6 +84,8 @@ class User {
       idMunicipio: idMunicipio,
       fotoPerfilUrl: fotoPerfilUrl ?? this.fotoPerfilUrl,
       fechaRegistro: fechaRegistro,
+      idSexo: idSexo ?? this.idSexo,
+      fechaNacimiento: fechaNacimiento ?? this.fechaNacimiento,
     );
   }
 }

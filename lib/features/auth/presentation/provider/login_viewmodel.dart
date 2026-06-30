@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +26,7 @@ class LoginViewModel extends StateNotifier<LoginViewModelState> {
   final MockLocationDetector _mockLocationDetector;
   final UsbDebugDetector _usbDebugDetector;
   final CurrentUserNotifier _currentUserNotifier;
+  Timer? _errorTimer;
 
   String _correo = '';
   String _contrasena = '';
@@ -88,12 +90,27 @@ class LoginViewModel extends StateNotifier<LoginViewModelState> {
   }
 
   void clearError() {
-    if (state.errorMessage == null) return;
+    _errorTimer?.cancel();
+    _errorTimer = null;
     state = state.copyWith(errorMessage: null);
   }
 
+  void _setError(String message) {
+    _errorTimer?.cancel();
+    state = state.copyWith(errorMessage: message);
+    _errorTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) clearError();
+    });
+  }
+
+  @override
+  void dispose() {
+    _errorTimer?.cancel();
+    super.dispose();
+  }
+
   Future<bool> login() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true);
     _updateCanSubmit();
     try {
       final user = await _repository.loginWithPassword(
@@ -107,16 +124,15 @@ class LoginViewModel extends StateNotifier<LoginViewModelState> {
     } on ApiException catch (e) {
       await _repository.logout();
       _currentUserNotifier.clear();
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      state = state.copyWith(isLoading: false);
+      _setError(e.message);
       _updateCanSubmit();
       return false;
     } catch (_) {
       await _repository.logout();
       _currentUserNotifier.clear();
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Ocurrio un error inesperado',
-      );
+      state = state.copyWith(isLoading: false);
+      _setError('Ocurrio un error inesperado');
       _updateCanSubmit();
       return false;
     }
@@ -155,10 +171,12 @@ class LoginViewModelState {
 
   bool get isSecurityCompromised => mockLocationDetected || usbDebugDetected;
 
+  static const _sentinel = Object();
+
   LoginViewModelState copyWith({
     LoginStep? step,
     bool? isLoading,
-    String? errorMessage,
+    Object? errorMessage = _sentinel,
     bool? checkingSecurity,
     bool? mockLocationDetected,
     bool? usbDebugDetected,
@@ -167,7 +185,9 @@ class LoginViewModelState {
     return LoginViewModelState(
       step: step ?? this.step,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: identical(errorMessage, _sentinel)
+          ? this.errorMessage
+          : errorMessage as String?,
       checkingSecurity: checkingSecurity ?? this.checkingSecurity,
       mockLocationDetected: mockLocationDetected ?? this.mockLocationDetected,
       usbDebugDetected: usbDebugDetected ?? this.usbDebugDetected,

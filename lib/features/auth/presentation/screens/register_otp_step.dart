@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../shared/widgets/widgets.dart';
 import '../provider/register_viewmodel.dart';
 import 'register_widgets.dart';
 
@@ -21,8 +22,12 @@ class OtpStepState extends ConsumerState<OtpStep> {
     FocusNode(),
     FocusNode(),
     FocusNode(),
+    FocusNode(),
+    FocusNode(),
   ];
   final List<TextEditingController> _controllers = [
+    TextEditingController(),
+    TextEditingController(),
     TextEditingController(),
     TextEditingController(),
     TextEditingController(),
@@ -49,14 +54,14 @@ class OtpStepState extends ConsumerState<OtpStep> {
   }
 
   void _onChanged(int index, String value) {
-    if (value.length == 1 && index < 3) {
+    if (value.length == 1 && index < 5) {
       _focusNodes[index + 1].requestFocus();
     }
     final code = _controllers.map((c) => c.text).join();
     widget.vm.setCodigo(code);
-    
+
     // Ocultar teclado cuando se completa el código
-    if (code.length == 4) {
+    if (code.length == 6) {
       FocusScope.of(context).unfocus();
     }
   }
@@ -69,113 +74,133 @@ class OtpStepState extends ConsumerState<OtpStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Código',
-          style: text.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurface,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 100),
+          child: Text(
+            'Código',
+            style: text.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurface,
+            ),
           ),
         ),
         const SizedBox(height: 6),
-        Text(
-          'Revisa tu correo electrónico e ingresa el código de 4 dígitos',
-          style: text.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 180),
+          child: Text(
+            'Revisa tu correo electrónico e ingresa el código de 6 dígitos',
+            style: text.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ),
         const SizedBox(height: 4),
-        Text.rich(
-          TextSpan(
-            children: [
-              const TextSpan(text: 'Enviado a '),
-              TextSpan(
-                text: widget.correo,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurface,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 260),
+          child: Text.rich(
+            TextSpan(
+              children: [
+                const TextSpan(text: 'Enviado a '),
+                TextSpan(
+                  text: widget.correo,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          style: text.bodySmall?.copyWith(
-            color: scheme.onSurfaceVariant,
+              ],
+            ),
+            style: text.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ),
         const SizedBox(height: 4),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: widget.vm.goBackToEmail,
-            icon: const Icon(Icons.edit_outlined, size: 16),
-            label: Text(
-              'Cambiar correo',
-              style: text.labelMedium,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 300),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: widget.vm.goBackToEmail,
+              icon: const Icon(Icons.edit_outlined, size: 16),
+              label: Text(
+                'Cambiar correo',
+                style: text.labelMedium,
+              ),
             ),
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: List.generate(4, (index) {
-            return Expanded(
-              child: Container(
-                margin: EdgeInsets.only(
-                  left: index == 0 ? 0 : 8,
-                  right: index == 3 ? 0 : 8,
-                ),
-                child: TextField(
-                  focusNode: _focusNodes[index],
-                  controller: _controllers[index],
-                  enabled: !widget.state.isLoading,
-                  keyboardType: TextInputType.number,
-                  textInputAction: index < 3
-                      ? TextInputAction.next
-                      : TextInputAction.done,
-                  maxLength: 1,
-                  textAlign: TextAlign.center,
-                  onChanged: (value) => _onChanged(index, value),
-                  onSubmitted: index == 3 ? (_) => widget.vm.verifyOtp() : null,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                    color: scheme.onSurface,
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 380),
+          child: Row(
+            children: List.generate(6, (index) {
+              return Expanded(
+                child: Container(
+                  margin: EdgeInsets.only(
+                    left: index == 0 ? 0 : 6,
+                    right: index == 5 ? 0 : 6,
                   ),
-                  decoration: InputDecoration(
-                    hintText: '0',
-                    hintStyle: TextStyle(
+                  child: TextField(
+                    focusNode: _focusNodes[index],
+                    controller: _controllers[index],
+                    enabled: !widget.state.isLoading,
+                    keyboardType: TextInputType.number,
+                    textInputAction: index < 5
+                        ? TextInputAction.next
+                        : TextInputAction.done,
+                    maxLength: 1,
+                    textAlign: TextAlign.center,
+                    onChanged: (value) => _onChanged(index, value),
+                    onSubmitted: index == 5 ? (_) => widget.vm.verifyOtp() : null,
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w500,
-                      color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      color: scheme.onSurface,
                     ),
-                    counterText: '',
-                    filled: true,
-                    fillColor: scheme.surfaceContainerLow,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: InputDecoration(
+                      hintText: '0',
+                      hintStyle: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      ),
+                      counterText: '',
+                      filled: true,
+                      fillColor: scheme.surfaceContainerLow,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
+          ),
         ),
         if (widget.state.errorMessage != null) ...[
           const SizedBox(height: 12),
-          ErrorBanner(
-            message: widget.state.errorMessage!,
-            onDismiss: widget.vm.clearError,
+          FadeSlideIn(
+            child: ErrorBanner(
+              message: widget.state.errorMessage!,
+              onDismiss: widget.vm.clearError,
+            ),
           ),
         ],
         const SizedBox(height: 24),
-        FilledButton(
-          onPressed: widget.state.canSubmit ? () => widget.vm.verifyOtp() : null,
-          child: widget.state.isLoading
-              ? SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: scheme.onPrimary,
-                  ),
-                )
-              : const Text('Continuar'),
+        FadeSlideIn(
+          delay: const Duration(milliseconds: 460),
+          child: FilledButton(
+            onPressed: widget.state.canSubmit ? () => widget.vm.verifyOtp() : null,
+            child: widget.state.isLoading
+                ? SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.onPrimary,
+                    ),
+                  )
+                : const Text('Continuar'),
+          ),
         ),
       ],
     );

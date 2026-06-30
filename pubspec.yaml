@@ -48,6 +48,7 @@ dependencies:
 
   # Cliente HTTP (obligatorio cátedra). Una sola instancia compartida via Provider.
   http: ^1.2.2
+  http_parser: ^4.0.2
 
   # Storage seguro para JWT (Android Keystore / iOS Keychain).
   flutter_secure_storage: ^9.2.4
@@ -63,6 +64,12 @@ dependencies:
   firebase_core: ^4.10.0
   firebase_messaging: ^16.3.0
   flutter_dotenv: ^5.1.0
+
+  # WebSocket en tiempo real (Socket.IO) — ubicación del conductor, cambios de estado del viaje.
+  socket_io_client: ^3.0.2
+
+  # Render de SVG a bytes para pines personalizados en Mapbox.
+  vector_graphics: ^1.1.18+1
 
 dev_dependencies:
   flutter_test:

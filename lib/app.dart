@@ -12,8 +12,7 @@ import 'features/trip/trip-in-progress/domain/entities/trip.dart';
 import 'features/trip/trip-in-progress/presentation/screens/trip_in_progress_screen.dart';
 import 'features/trip/trip-searching/presentation/screens/trip_searching_screen.dart';
 import 'routes/app_routes.dart';
-import 'theme/theme.dart';
-import 'theme/util.dart';
+import 'theme/jala_theme.dart';
 
 class JalaApp extends StatelessWidget {
   const JalaApp({super.key});
@@ -35,7 +34,7 @@ class JalaApp extends StatelessWidget {
       darkTheme: theme.dark(),
       themeMode:
           brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
-      initialRoute: AppRoutes.login,
+      initialRoute: AppRoutes.splash,
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case AppRoutes.splash:

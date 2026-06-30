@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/current_user_provider.dart';
 import '../../../../core/widgets/bubble_loader.dart';
+import '../../../../theme/jala_theme.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/di/auth_module.dart';
 
@@ -23,7 +24,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
 
@@ -32,7 +33,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
+      begin: const Offset(0, 0.1),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _controller,
@@ -45,10 +46,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _decideRoute() async {
     final authRepo = ref.read(authRepositoryProvider);
+    // Verificar sesión + delay mínimo en paralelo.
+    // El delay es solo para que la animación del logo termine.
     final results = await Future.wait<dynamic>([
       authRepo.hasSession(),
       authRepo.getCurrentUser(),
-      Future<void>.delayed(const Duration(milliseconds: 1200)),
+      Future<void>.delayed(const Duration(milliseconds: 400)),
     ]);
     final hasSession = results[0] as bool;
     final user = results[1];
@@ -70,7 +73,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F6F6),
+      backgroundColor: context.brand.surfaceLight,
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,

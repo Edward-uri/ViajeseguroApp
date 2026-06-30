@@ -152,8 +152,12 @@ class _JalaAlertBannerState extends State<JalaAlertBanner>
               if (widget.onDismiss != null) ...[
                 const SizedBox(width: 8),
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: widget.onDismiss,
-                  child: Icon(Icons.close, size: 18, color: accent),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(Icons.close, size: 18, color: accent),
+                  ),
                 ),
               ],
             ],
