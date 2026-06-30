@@ -38,6 +38,7 @@ class TripHistoryItem {
 
   bool get isCompletado => estado == TripHistoryStatus.completado;
   bool get isCancelado => estado == TripHistoryStatus.cancelado;
+  bool get isEnCurso => estado == TripHistoryStatus.enCurso;
 
   String get tipoLabel {
     if (tipo == 'envio') return 'Envio de paquete';

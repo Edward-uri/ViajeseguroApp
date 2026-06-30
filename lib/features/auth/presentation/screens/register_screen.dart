@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../shared/widgets/widgets.dart';
 import '../provider/register_viewmodel.dart';
 import 'register_email_step.dart';
 import 'register_form_additional_step.dart';
@@ -72,22 +73,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 32),
-                Center(
-                  child: SvgPicture.asset(
-                    'lib/shared/icons/Mototaxi Línea.svg',
-                    width: 160,
-                    height: 120,
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 100),
+                  child: Center(
+                    child: SvgPicture.asset(
+                      'lib/shared/icons/Mototaxi Línea.svg',
+                      width: 160,
+                      height: 120,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Jala',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w700,
-                    color: scheme.onSurface,
-                    letterSpacing: 2.4,
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 200),
+                  child: Text(
+                    'Jala',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      letterSpacing: 2.4,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

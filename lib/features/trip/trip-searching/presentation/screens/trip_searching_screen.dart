@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
 import '../../../../../routes/app_routes.dart';
+import '../../../../../shared/utils/svg_to_mapbox.dart';
 import '../../../../../shared/widgets/widgets.dart';
-import '../../../../../theme/theme.dart';
-import '../../../trip-in-progress/domain/entities/trip.dart';
+import '../../../../../theme/jala_theme.dart';
+import '../../../trip-in-progress/domain/entities/estimacion_viaje.dart';
 import '../../di/trip_searching_module.dart';
 import '../../domain/entities/trip_location.dart';
 import '../provider/trip_searching_viewmodel.dart';
@@ -21,11 +25,14 @@ class TripSearchingScreen extends ConsumerStatefulWidget {
 class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   MapboxMap? _mapboxMap;
   PolylineAnnotationManager? _polylineManager;
+  PointAnnotationManager? _pinMarkerManager;
+  bool _pinImagesLoaded = false;
   final _originController = TextEditingController();
   final _destinationController = TextEditingController();
   final _originFocusNode = FocusNode();
   final _destinationFocusNode = FocusNode();
   geo.Position? _currentPosition;
+  Timer? _cameraDebounce;
 
   @override
   void initState() {
@@ -38,6 +45,7 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
 
   @override
   void dispose() {
+    _cameraDebounce?.cancel();
     _originController.dispose();
     _destinationController.dispose();
     _originFocusNode.dispose();
@@ -87,9 +95,40 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
     } catch (e) {
       debugPrint('[TripSearching] PolylineAnnotation no disponible: $e');
     }
+    try {
+      _pinMarkerManager = await mapboxMap.annotations.createPointAnnotationManager();
+    } catch (e) {
+      debugPrint('[TripSearching] PinMarkerManager no disponible: $e');
+    }
+
+    // Cargar pines SVG como imágenes de estilo del mapa
+    await _loadPinImages();
 
     if (_currentPosition != null) {
       _flyTo(_currentPosition!.latitude, _currentPosition!.longitude);
+    }
+  }
+
+  Future<void> _loadPinImages() async {
+    if (_pinImagesLoaded || _mapboxMap == null) return;
+    try {
+      await addSvgPinToMap(
+        _mapboxMap!,
+        'pin-azul',
+        'lib/shared/icons/Pin-Azul.svg',
+        width: 30,
+        height: 36,
+      );
+      await addSvgPinToMap(
+        _mapboxMap!,
+        'pin-naranja',
+        'lib/shared/icons/Pin-Naranja.svg',
+        width: 30,
+        height: 36,
+      );
+      _pinImagesLoaded = true;
+    } catch (e) {
+      debugPrint('[TripSearching] Error cargando pines SVG: $e');
     }
   }
 
@@ -101,7 +140,13 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
     final center = data.cameraState.center;
     final lat = center.coordinates.lat.toDouble();
     final lng = center.coordinates.lng.toDouble();
-    notifier.updatePendingMapPosition(lat, lng);
+
+    _cameraDebounce?.cancel();
+    _cameraDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (mounted) {
+        notifier.updatePendingMapPosition(lat, lng);
+      }
+    });
   }
 
   void _onMapIdle(MapIdleEventData data) {
@@ -139,6 +184,9 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
       debugPrint('[TripSearching] No se pudo dibujar ruta: $e');
     }
 
+    // Dibujar pines de origen y destino en el mapa
+    _drawOriginDestinationPins(origin, destination);
+
     _mapboxMap?.flyTo(
       CameraOptions(
         center: Point(coordinates: Position(
@@ -151,8 +199,54 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
     );
   }
 
+  void _drawOriginDestinationPins(TripLocation origin, TripLocation destination) {
+    if (_pinMarkerManager == null) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_pinMarkerManager != null && mounted) {
+          _drawOriginDestinationPins(origin, destination);
+        }
+      });
+      return;
+    }
+
+    // Si las imágenes SVG aún no se han cargado, esperar y reintentar
+    if (!_pinImagesLoaded) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (_pinImagesLoaded && mounted) {
+          _drawOriginDestinationPins(origin, destination);
+        }
+      });
+      return;
+    }
+
+    try {
+      _pinMarkerManager!.deleteAll();
+
+      // Pin de origen (azul) — SVG
+      _pinMarkerManager!.create(PointAnnotationOptions(
+        geometry: Point(
+          coordinates: Position(origin.longitude, origin.latitude),
+        ),
+        iconImage: 'pin-azul',
+        iconSize: 1.0,
+      )).then((_) {}).catchError((_) {});
+
+      // Pin de destino (naranja) — SVG
+      _pinMarkerManager!.create(PointAnnotationOptions(
+        geometry: Point(
+          coordinates: Position(destination.longitude, destination.latitude),
+        ),
+        iconImage: 'pin-naranja',
+        iconSize: 1.0,
+      )).then((_) {}).catchError((_) {});
+    } catch (e) {
+      debugPrint('[TripSearching] Error dibujando pines: $e');
+    }
+  }
+
   void _clearRoute() {
     _polylineManager?.deleteAll();
+    _pinMarkerManager?.deleteAll();
   }
 
   @override
@@ -189,14 +283,23 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
           // no en cada tecla del buscador ni en cada cambio del panel inferior.
           Consumer(
             builder: (context, ref, _) {
-              final isPickingOnMap = ref.watch(
-                tripSearchingViewModelProvider.select((s) => s.isPickingOnMap),
+              final vm = ref.watch(
+                tripSearchingViewModelProvider.select((s) => (
+                  s.isPickingOnMap,
+                  s.activeInput,
+                )),
               );
+              final isPickingOnMap = vm.$1;
+              final activeInput = vm.$2;
+              final pinColor = activeInput == LocationInputMode.origin
+                  ? context.brand.accentBlue
+                  : JalaBrand.amber;
               return JalaMapView(
                 onMapCreated: _onMapCreated,
                 showLocationMarker: false,
                 showCurrentLocationPin: true,
                 showPinMarker: isPickingOnMap,
+                pinMarkerColor: pinColor,
                 onCameraChanged: _onCameraChanged,
                 onMapIdle: _onMapIdle,
               );
@@ -212,18 +315,21 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
           // Boton flotante: su posicion depende de la altura del panel.
           // .select sobre un double -> solo rebuild cuando esa altura cambia,
           // no en cada keystroke ni en cada tick de camara.
+          // AnimatedPositioned para que la transicion sea suave.
           if (_currentPosition != null)
             Consumer(
               builder: (context, ref, _) {
                 final panelHeight = ref.watch(
                   tripSearchingViewModelProvider.select(_bottomPanelHeight),
                 );
-                return Positioned(
+                return AnimatedPositioned(
+                  duration: const Duration(milliseconds: 350),
+                  curve: Curves.easeInOutCubic,
                   right: 24,
                   bottom: panelHeight + bottomPadding + 16,
                   child: JalaFloatingCircleButton(
                     icon: Icons.my_location,
-                    iconColor: const Color(0xFF005B9F),
+                    iconColor: context.brand.accentBlue,
                     iconSize: 24,
                     onTap: _getCurrentLocation,
                   ),
@@ -326,20 +432,21 @@ class _BottomPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.75,
+        maxHeight: MediaQuery.of(context).size.height * 0.72,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: context.colors.onSurface.withValues(alpha: 0.1),
             blurRadius: 24,
             offset: const Offset(0, -6),
           ),
         ],
       ),
       child: SingleChildScrollView(
+        padding: EdgeInsets.only(bottom: bottomPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -348,26 +455,24 @@ class _BottomPanel extends StatelessWidget {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: const Color(0xFFD1D1D1),
+                color: context.brand.greyBorder,
                 borderRadius: BorderRadius.circular(2.5),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'A donde vas?',
-                    style: TextStyle(
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 26,
+                    style: context.text.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1410),
+                      color: context.colors.onSurface,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 14),
                   _LocationInputs(
                     vm: vm,
                     notifier: notifier,
@@ -376,16 +481,16 @@ class _BottomPanel extends StatelessWidget {
                     originFocusNode: originFocusNode,
                     destinationFocusNode: destinationFocusNode,
                   ),
-                  if (vm.isPickingOnMap) ...[
-                    const SizedBox(height: 16),
-                    _PickOnMapPanel(
-                      vm: vm,
-                      notifier: notifier,
-                    ),
-                  ],
-                  if (!vm.isPickingOnMap && vm.searchQuery.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _SearchResults(
+                  const _SectionSpacer(isVisible: true),
+                  _AnimatedSection(
+                    visible: vm.isPickingOnMap,
+                    sectionKey: 'pickOnMap',
+                    child: _PickOnMapPanel(vm: vm, notifier: notifier),
+                  ),
+                  _AnimatedSection(
+                    visible: !vm.isPickingOnMap && vm.searchQuery.isNotEmpty,
+                    sectionKey: 'searchResults',
+                    child: _SearchResults(
                       results: vm.searchResults,
                       isSearching: vm.isSearching,
                       onSelect: (location) {
@@ -397,54 +502,88 @@ class _BottomPanel extends StatelessWidget {
                         }
                       },
                     ),
-                  ],
-                  if (!vm.isPickingOnMap &&
-                      vm.searchQuery.isEmpty &&
-                      vm.searchResults.isEmpty &&
-                      !vm.isSearching &&
-                      vm.activeInput == LocationInputMode.origin &&
-                      vm.origin == null) ...[
-                    const SizedBox(height: 12),
-                    _CurrentLocationButton(onTap: onUseCurrentLocation),
-                  ],
-                  if (vm.hasRoute && vm.step != TripSearchingStep.fareShown) ...[
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: vm.isLoading ? null : () => onRequestFare(),
-                        child: vm.isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Solicitar viaje'),
-                      ),
-                    ),
-                  ],
-                  if (vm.step == TripSearchingStep.fareShown && vm.trip != null) ...[
-                    const SizedBox(height: 20),
-                    _FareSummaryCard(trip: vm.trip!),
-                    const SizedBox(height: 16),
-                    Row(
+                  ),
+                  _AnimatedSection(
+                    visible: !vm.isPickingOnMap &&
+                        vm.searchQuery.isEmpty &&
+                        vm.searchResults.isEmpty &&
+                        !vm.isSearching &&
+                        vm.activeInput == LocationInputMode.origin &&
+                        vm.origin == null,
+                    sectionKey: 'currentLocation',
+                    child: _CurrentLocationButton(onTap: onUseCurrentLocation),
+                  ),
+                  _AnimatedSection(
+                    visible: vm.hasRoute && vm.step != TripSearchingStep.fareShown,
+                    sectionKey: 'passengers',
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => notifier.rejectFare(),
-                            child: const Text('Cancelar'),
-                          ),
+                        _PassengerSelector(
+                          count: vm.numPersonas,
+                          onChanged: notifier.setNumPersonas,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
                           child: FilledButton(
-                            onPressed: () => onConfirmTrip(),
-                            child: const Text('Confirmar'),
+                            onPressed: vm.isLoading ? null : () => onRequestFare(),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(46),
+                            ),
+                            child: vm.isLoading
+                                ? const SizedBox(
+                                    height: 18,
+                                    width: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Estimar viaje'),
                           ),
                         ),
                       ],
                     ),
-                  ],
+                  ),
+                  if (vm.step == TripSearchingStep.fareShown && vm.estimacion != null)
+                    _AnimatedSection(
+                      visible: true,
+                      sectionKey: 'fareCard',
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _EstimationCard(estimacion: vm.estimacion!),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => notifier.rejectFare(),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(46),
+                                  ),
+                                  child: const Text('Cancelar'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: vm.isLoading ? null : () => onConfirmTrip(),
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(46),
+                                  ),
+                                  child: vm.isLoading
+                                      ? const SizedBox(
+                                          height: 18,
+                                          width: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : const Text('Confirmar'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   if (vm.errorMessage != null) ...[
                     const SizedBox(height: 12),
                     JalaAlertBanner(
@@ -452,11 +591,10 @@ class _BottomPanel extends StatelessWidget {
                       onDismiss: notifier.clearError,
                     ),
                   ],
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
-            SizedBox(height: bottomPadding),
           ],
         ),
       ),
@@ -485,48 +623,112 @@ class _LocationInputs extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _LocationField(
-          label: 'Origen',
-          icon: Icons.trip_origin,
-          controller: originController,
-          focusNode: originFocusNode,
-          isActive: vm.activeInput == LocationInputMode.origin && !vm.isPickingOnMap,
-          isPickingOnMap: vm.isPickingOnMap && vm.activeInput == LocationInputMode.origin,
-          enabled: !vm.isPickingOnMap,
-          onTap: () => notifier.activateOriginInput(),
-          onPinTap: () {
+      _LocationField(
+        label: 'Origen',
+        isOrigin: true,
+        controller: originController,
+        focusNode: originFocusNode,
+        isActive: vm.activeInput == LocationInputMode.origin && !vm.isPickingOnMap,
+        isPickingOnMap: vm.isPickingOnMap && vm.activeInput == LocationInputMode.origin,
+        enabled: !vm.isPickingOnMap,
+        onTap: () => notifier.activateOriginInput(),
+        onPinTap: () {
+          if (vm.isPickingOnMap && vm.activeInput == LocationInputMode.origin) {
+            notifier.cancelPickOnMap();
+          } else {
             notifier.activateOriginInput();
             notifier.startPickOnMap();
-          },
-          onChanged: (value) {
-            if (!vm.isPickingOnMap) {
-              notifier.setSearchQuery(value);
-            }
-          },
-        ),
-        const SizedBox(height: 12),
-        _LocationField(
-          label: 'Destino',
-          icon: Icons.location_on,
-          controller: destinationController,
-          focusNode: destinationFocusNode,
-          isActive: vm.activeInput == LocationInputMode.destination && !vm.isPickingOnMap,
-          isPickingOnMap: vm.isPickingOnMap && vm.activeInput == LocationInputMode.destination,
-          enabled: vm.origin != null && !vm.isPickingOnMap,
-          onTap: () => notifier.activateDestinationInput(),
-          onPinTap: () {
-            if (vm.origin != null) {
-              notifier.activateDestinationInput();
-              notifier.startPickOnMap();
-            }
-          },
-          onChanged: (value) {
-            if (!vm.isPickingOnMap) {
-              notifier.setSearchQuery(value);
-            }
-          },
-        ),
-      ],
+          }
+        },
+        onChanged: (value) {
+          if (!vm.isPickingOnMap) {
+            notifier.setSearchQuery(value);
+          }
+        },
+      ),
+      const SizedBox(height: 12),
+      _LocationField(
+        label: 'Destino',
+        isOrigin: false,
+        controller: destinationController,
+        focusNode: destinationFocusNode,
+        isActive: vm.activeInput == LocationInputMode.destination && !vm.isPickingOnMap,
+        isPickingOnMap: vm.isPickingOnMap && vm.activeInput == LocationInputMode.destination,
+        enabled: vm.origin != null && !vm.isPickingOnMap,
+        onTap: () => notifier.activateDestinationInput(),
+        onPinTap: () {
+          if (vm.isPickingOnMap && vm.activeInput == LocationInputMode.destination) {
+            notifier.cancelPickOnMap();
+          } else if (vm.origin != null) {
+            notifier.activateDestinationInput();
+            notifier.startPickOnMap();
+          }
+        },
+        onChanged: (value) {
+          if (!vm.isPickingOnMap) {
+            notifier.setSearchQuery(value);
+          }
+        },
+      ),
+    ],
+    );
+  }
+}
+
+class _AnimatedSection extends StatelessWidget {
+  const _AnimatedSection({required this.visible, required this.child, this.sectionKey});
+
+  final bool visible;
+  final Widget child;
+  final String? sectionKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOutCubic,
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.hardEdge,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, -0.04),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: visible
+            ? Padding(
+                key: ValueKey(sectionKey ?? 'section'),
+                padding: const EdgeInsets.only(top: 12),
+                child: child,
+              )
+            : const SizedBox.shrink(key: ValueKey('empty')),
+      ),
+    );
+  }
+}
+
+class _SectionSpacer extends StatelessWidget {
+  const _SectionSpacer({required this.isVisible});
+
+  final bool isVisible;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeInOutCubic,
+      clipBehavior: Clip.hardEdge,
+      child: isVisible ? const SizedBox(height: 12) : const SizedBox.shrink(),
     );
   }
 }
@@ -534,7 +736,7 @@ class _LocationInputs extends StatelessWidget {
 class _LocationField extends StatelessWidget {
   const _LocationField({
     required this.label,
-    required this.icon,
+    required this.isOrigin,
     required this.controller,
     required this.focusNode,
     required this.isActive,
@@ -546,7 +748,7 @@ class _LocationField extends StatelessWidget {
   });
 
   final String label;
-  final IconData icon;
+  final bool isOrigin;
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool isActive;
@@ -558,29 +760,25 @@ class _LocationField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final brand = context.brand;
+
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F6),
+          color: brand.surfaceLight,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: (isActive || isPickingOnMap)
-                ? JalaBrand.amber
-                : const Color(0xFFD1D1D1),
-            width: (isActive || isPickingOnMap) ? 2 : 1,
+            color: brand.greyBorder,
+            width: 1,
           ),
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: (isActive || isPickingOnMap)
-                  ? JalaBrand.amber
-                  : const Color(0xFF6B6661),
-              size: 22,
-            ),
+            _PinSvg(isOrigin: isOrigin),
             const SizedBox(width: 12),
             Expanded(
               child: TextField(
@@ -588,19 +786,15 @@ class _LocationField extends StatelessWidget {
                 focusNode: focusNode,
                 enabled: enabled,
                 onChanged: onChanged,
-                style: const TextStyle(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontSize: 16,
+                style: context.text.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF1A1410),
+                  color: colors.onSurface,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Buscar $label',
-                  hintStyle: const TextStyle(
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Color(0xFFB6B3B1),
+                  hintStyle: context.text.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w400,
+                    color: brand.greyLight,
                   ),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -617,16 +811,35 @@ class _LocationField extends StatelessWidget {
               child: Icon(
                 isPickingOnMap ? Icons.close : Icons.place,
                 color: isPickingOnMap
-                    ? Colors.red
+                    ? colors.error
                     : enabled
-                        ? JalaBrand.amber
-                        : const Color(0xFFD1D1D1),
+                        ? colors.onSurfaceVariant
+                        : brand.greyBorder,
                 size: 22,
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Pin SVG de origen (azul) o destino (naranja).
+class _PinSvg extends StatelessWidget {
+  const _PinSvg({required this.isOrigin, this.size = 20});
+
+  final bool isOrigin;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      isOrigin
+          ? 'lib/shared/icons/Pin-Azul.svg'
+          : 'lib/shared/icons/Pin-Naranja.svg',
+      width: size,
+      height: size * 1.2,
     );
   }
 }
@@ -642,24 +855,25 @@ class _PickOnMapPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8F0),
+        color: context.brand.surfaceLight,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: JalaBrand.amber.withValues(alpha: 0.3)),
+        border: Border.all(color: context.brand.greyBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.place, color: JalaBrand.amber, size: 20),
-              SizedBox(width: 8),
-              Text(
-                'Mueve el mapa para seleccionar',
-                style: TextStyle(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1410),
+              const Icon(Icons.place, color: JalaBrand.amber, size: 18),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Mueve el mapa para seleccionar',
+                  style: context.text.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: context.colors.onSurface,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -670,22 +884,40 @@ class _PickOnMapPanel extends StatelessWidget {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => notifier.cancelPickOnMap(),
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: const Icon(Icons.close, size: 16),
                   label: const Text('Cancelar'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    textStyle: context.text.labelMedium,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: FilledButton.icon(
-                  onPressed: vm.isLoading ? null : () => notifier.confirmPinFromMap(),
-                  icon: vm.isLoading
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.check, size: 18),
-                  label: const Text('Confirmar'),
+                child: AnimatedOpacity(
+                  opacity: vm.isLoading ? 0.6 : 1.0,
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeInOut,
+                  child: AnimatedScale(
+                    scale: vm.isLoading ? 0.97 : 1.0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    child: FilledButton.icon(
+                      onPressed: vm.isLoading ? null : () => notifier.confirmPinFromMap(),
+                      icon: vm.isLoading
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check, size: 16),
+                      label: const Text('Confirmar'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        textStyle: context.text.labelMedium,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -708,9 +940,9 @@ class _CurrentLocationButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFF6F6F6),
+          color: context.brand.surfaceLight,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD1D1D1), width: 1),
+          border: Border.all(color: context.brand.greyBorder, width: 1),
         ),
         child: Row(
           children: [
@@ -718,23 +950,21 @@ class _CurrentLocationButton extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1E0),
+                color: context.brand.surfaceLight,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.my_location,
-                color: JalaBrand.amber,
+                color: context.brand.accentBlue,
                 size: 20,
               ),
             ),
             const SizedBox(width: 12),
-            const Text(
+            Text(
               'Usar mi ubicacion actual',
-              style: TextStyle(
-                fontFamily: 'Plus Jakarta Sans',
-                fontSize: 15,
+              style: context.text.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF1A1410),
+                color: context.colors.onSurface,
               ),
             ),
           ],
@@ -744,7 +974,7 @@ class _CurrentLocationButton extends StatelessWidget {
   }
 }
 
-class _SearchResults extends StatelessWidget {
+class _SearchResults extends StatefulWidget {
   const _SearchResults({
     required this.results,
     required this.isSearching,
@@ -756,114 +986,403 @@ class _SearchResults extends StatelessWidget {
   final void Function(TripLocation location) onSelect;
 
   @override
+  State<_SearchResults> createState() => _SearchResultsState();
+}
+
+class _SearchResultsState extends State<_SearchResults> {
+  int _previousCount = 0;
+
+  @override
+  void didUpdateWidget(covariant _SearchResults oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.results.length != oldWidget.results.length) {
+      _previousCount = oldWidget.results.length;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (isSearching) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: CircularProgressIndicator(),
-        ),
+    if (widget.isSearching) {
+      return Container(
+        key: const ValueKey('loading'),
+        padding: const EdgeInsets.all(16),
+        child: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (results.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16),
+    if (widget.results.isEmpty) {
+      return Container(
+        key: const ValueKey('empty'),
+        padding: const EdgeInsets.all(16),
         child: Text(
           'No se encontraron resultados',
-          style: TextStyle(
-            fontFamily: 'Plus Jakarta Sans',
-            fontSize: 14,
-            color: Color(0xFF6B6661),
+          style: context.text.bodyMedium?.copyWith(
+            color: context.brand.greyDark,
           ),
         ),
       );
     }
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 300),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: results.length,
-        itemBuilder: (context, index) {
-          final location = results[index];
-          return ListTile(
-            leading: const Icon(Icons.location_on, color: JalaBrand.amber),
-            title: Text(
-              location.placeName ?? location.address,
-              style: const TextStyle(
-                fontFamily: 'Plus Jakarta Sans',
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
+    const itemHeight = 72.0;
+    const visibleCount = 3;
+    final maxHeight = itemHeight * visibleCount;
+    final needsScroll = widget.results.length > visibleCount;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: needsScroll
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+            )
+          : null,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          children: [
+            ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.only(bottom: needsScroll ? 24 : 0),
+              itemCount: widget.results.length,
+              itemBuilder: (context, index) {
+                return _AnimatedSearchItem(
+                  key: ValueKey(widget.results[index].address + index.toString()),
+                  location: widget.results[index],
+                  delay: index < _previousCount
+                      ? Duration.zero
+                      : Duration(milliseconds: 60 * (index - _previousCount).clamp(0, 4)),
+                  onSelect: widget.onSelect,
+                );
+              },
             ),
-            subtitle: Text(
-              location.address,
-              style: const TextStyle(
-                fontFamily: 'Plus Jakarta Sans',
-                fontSize: 13,
-                color: Color(0xFF6B6661),
+            if (needsScroll)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 32,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        context.colors.surfaceContainerLowest.withValues(alpha: 0.0),
+                        context.colors.surfaceContainerLowest.withValues(alpha: 0.95),
+                      ],
+                    ),
+                  ),
+                  alignment: Alignment.bottomCenter,
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'Desliza para ver mas',
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.brand.greyDark,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            onTap: () => onSelect(location),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
 }
 
-class _FareSummaryCard extends StatelessWidget {
-  const _FareSummaryCard({required this.trip});
+class _AnimatedSearchItem extends StatefulWidget {
+  const _AnimatedSearchItem({
+    super.key,
+    required this.location,
+    required this.delay,
+    required this.onSelect,
+  });
 
-  final Trip trip;
+  final TripLocation location;
+  final Duration delay;
+  final void Function(TripLocation location) onSelect;
+
+  @override
+  State<_AnimatedSearchItem> createState() => _AnimatedSearchItemState();
+}
+
+class _AnimatedSearchItemState extends State<_AnimatedSearchItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.15),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+    if (widget.delay == Duration.zero) {
+      _controller.value = 1.0;
+    } else {
+      Future.delayed(widget.delay, () {
+        if (mounted) _controller.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: SlideTransition(
+        position: _slideAnim,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => widget.onSelect(widget.location),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: JalaBrand.amber.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.location_on,
+                      color: JalaBrand.amber,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.location.placeName ?? widget.location.address,
+                          style: context.text.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.location.address,
+                          style: context.text.bodySmall?.copyWith(
+                            color: context.brand.greyDark,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PassengerSelector extends StatelessWidget {
+  const _PassengerSelector({required this.count, required this.onChanged});
+
+  final int count;
+  final ValueChanged<int> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF1E0),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: JalaBrand.amber.withValues(alpha: 0.3)),
+        color: context.brand.surfaceLight,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.brand.greyBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.group_rounded, size: 22, color: context.colors.onSurfaceVariant),
+          const SizedBox(width: 10),
+          Text(
+            'Pasajeros',
+            style: context.text.bodyLarge?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: context.colors.onSurface,
+            ),
+          ),
+          const Spacer(),
+          Row(
+            children: [
+              _PassengerButton(
+                icon: Icons.remove_rounded,
+                enabled: count > 1,
+                onTap: () => onChanged(count - 1),
+              ),
+              SizedBox(
+                width: 40,
+                child: Text(
+                  '$count',
+                  textAlign: TextAlign.center,
+                  style: context.text.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: context.colors.onSurface,
+                  ),
+                ),
+              ),
+              _PassengerButton(
+                icon: Icons.add_rounded,
+                enabled: count < 3,
+                onTap: () => onChanged(count + 1),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PassengerButton extends StatelessWidget {
+  const _PassengerButton({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: enabled
+              ? JalaBrand.amber.withValues(alpha: 0.15)
+              : context.brand.surfaceLight,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: enabled ? JalaBrand.amber : context.brand.greyBorder,
+        ),
+      ),
+    );
+  }
+}
+
+class _EstimationCard extends StatelessWidget {
+  const _EstimationCard({required this.estimacion});
+
+  final EstimacionViaje estimacion;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: context.brand.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.brand.greyBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'Tarifa del viaje',
-            style: TextStyle(
-              fontFamily: 'Plus Jakarta Sans',
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF6B6661),
-            ),
-          ),
-          const SizedBox(height: 8),
+          // Tarifa destacada
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '\$${trip.fare.totalFare.toStringAsFixed(2)} MXN',
-                style: const TextStyle(
-                  fontFamily: 'Plus Jakarta Sans',
-                  fontSize: 28,
+                '\$${estimacion.tarifa.toStringAsFixed(0)}',
+                style: context.text.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF1A1410),
+                  color: context.colors.onSurface,
                 ),
               ),
-              if (trip.distanciaKm != null)
-                Text(
-                  '${trip.distanciaKm!.toStringAsFixed(1)} km',
-                  style: const TextStyle(
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1410),
+              const SizedBox(width: 4),
+              Text(
+                'MXN',
+                style: context.text.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: context.brand.greyDark,
+                ),
+              ),
+              const Spacer(),
+              if (estimacion.tarifaEstimada)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: context.colors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'Estimada',
+                    style: context.text.labelSmall?.copyWith(
+                      color: context.brand.greyDark,
+                    ),
                   ),
                 ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Divider(color: context.colors.outlineVariant, height: 1),
+          const SizedBox(height: 10),
+          // Detalles: distancia/tiempo y personas/precio-unitario
+          Row(
+            children: [
+              Icon(Icons.route_rounded, size: 16, color: context.brand.greyDark),
+              const SizedBox(width: 6),
+              if (estimacion.distanciaKm > 0)
+                Text(
+                  '${estimacion.distanciaKm.toStringAsFixed(1)} km · ${estimacion.duracionMin.toStringAsFixed(0)} min',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.brand.greyDark,
+                  ),
+                )
+              else
+                Text(
+                  'Zona fija',
+                  style: context.text.bodySmall?.copyWith(
+                    color: context.brand.greyDark,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(Icons.group_rounded, size: 16, color: context.brand.greyDark),
+              const SizedBox(width: 6),
+              Text(
+                '${estimacion.personas} ${estimacion.personas == 1 ? "persona" : "personas"} · \$${estimacion.tarifaPorPersona.toStringAsFixed(0)} c/u',
+                style: context.text.bodySmall?.copyWith(
+                  color: context.brand.greyDark,
+                ),
+              ),
             ],
           ),
         ],

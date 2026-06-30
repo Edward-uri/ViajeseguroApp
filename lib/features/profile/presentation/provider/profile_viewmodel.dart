@@ -18,7 +18,7 @@ class ProfileViewModel extends StateNotifier<ProfileViewModelState> {
   final AuthStorage _authStorage;
 
   Future<void> loadProfile() async {
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true, errorMessage: null, hasSessionExpired: false);
     try {
       final user = await _profileRepo.getMe();
       state = ProfileViewModelState(user: user);
@@ -26,6 +26,7 @@ class ProfileViewModel extends StateNotifier<ProfileViewModelState> {
       await _authRepo.logout();
       state = const ProfileViewModelState(
         errorMessage: 'Tu sesion expiro. Inicia sesion de nuevo.',
+        hasSessionExpired: true,
       );
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.message);
@@ -37,27 +38,52 @@ class ProfileViewModel extends StateNotifier<ProfileViewModelState> {
     }
   }
 
+  Future<bool> updateProfile({
+    String? nombre,
+    String? apellidoPaterno,
+    String? apellidoMaterno,
+    int? idSexo,
+    String? fechaNacimiento,
+    String? telefono,
+  }) async {
+    state = state.copyWith(isSaving: true, errorMessage: null);
+    try {
+      await _profileRepo.updateProfile(
+        nombre: nombre,
+        apellidoPaterno: apellidoPaterno,
+        apellidoMaterno: apellidoMaterno,
+        idSexo: idSexo,
+        fechaNacimiento: fechaNacimiento,
+        telefono: telefono,
+      );
+      await loadProfile();
+      return true;
+    } on ApiException catch (e) {
+      state = state.copyWith(isSaving: false, errorMessage: e.message);
+      return false;
+    } catch (_) {
+      state = state.copyWith(
+        isSaving: false,
+        errorMessage: 'No se pudo actualizar el perfil',
+      );
+      return false;
+    }
+  }
+
   Future<bool> uploadNewPhoto({
     required List<int> bytes,
     required String contentType,
+    required String fileName,
   }) async {
     if (state.user == null) return false;
     state = state.copyWith(isUploadingPhoto: true, errorMessage: null);
     try {
-      final ticket =
-          await _profileRepo.requestPhotoUpload(contentType: contentType);
-      if (bytes.length > ticket.maxBytes) {
-        throw ApiException(
-          'La imagen excede el tamano maximo permitido (${ticket.maxBytes ~/ (1024 * 1024)} MB).',
-        );
-      }
-      await _profileRepo.uploadBytesToS3(
-        uploadUrl: ticket.uploadUrl,
+      await _profileRepo.uploadPhotoDirect(
         bytes: bytes,
+        fileName: fileName,
         contentType: contentType,
       );
-      final user = await _profileRepo.confirmPhotoUpload(s3Key: ticket.s3Key);
-      state = ProfileViewModelState(user: user, isUploadingPhoto: false);
+      await loadProfile();
       return true;
     } on ApiException catch (e) {
       state = state.copyWith(
@@ -103,7 +129,6 @@ class ProfileViewModel extends StateNotifier<ProfileViewModelState> {
   }
 
   void clearError() {
-    if (state.errorMessage == null) return;
     state = state.copyWith(errorMessage: null);
   }
 }
@@ -112,30 +137,38 @@ class ProfileViewModelState {
   const ProfileViewModelState({
     this.user,
     this.isLoading = false,
+    this.isSaving = false,
     this.isUploadingPhoto = false,
     this.isDeleting = false,
     this.errorMessage,
+    this.hasSessionExpired = false,
   });
 
   final User? user;
   final bool isLoading;
+  final bool isSaving;
   final bool isUploadingPhoto;
   final bool isDeleting;
   final String? errorMessage;
+  final bool hasSessionExpired;
 
   ProfileViewModelState copyWith({
     User? user,
     bool? isLoading,
+    bool? isSaving,
     bool? isUploadingPhoto,
     bool? isDeleting,
     String? errorMessage,
+    bool? hasSessionExpired,
   }) {
     return ProfileViewModelState(
       user: user ?? this.user,
       isLoading: isLoading ?? this.isLoading,
+      isSaving: isSaving ?? this.isSaving,
       isUploadingPhoto: isUploadingPhoto ?? this.isUploadingPhoto,
       isDeleting: isDeleting ?? this.isDeleting,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: errorMessage,
+      hasSessionExpired: hasSessionExpired ?? this.hasSessionExpired,
     );
   }
 }

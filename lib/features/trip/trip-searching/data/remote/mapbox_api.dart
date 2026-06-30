@@ -21,7 +21,7 @@ class MapboxApi {
     }
     final encoded = Uri.encodeQueryComponent(query);
     final url = Uri.parse(
-      '$_geocodingBase/$encoded.json?access_token=$token&limit=5&language=es',
+      '$_geocodingBase/$encoded.json?access_token=$token&limit=5&language=es&country=mx',
     );
     final response = await _client.get(url);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -36,7 +36,7 @@ class MapboxApi {
       return {'features': const []};
     }
     final url = Uri.parse(
-      '$_geocodingBase/$longitude,$latitude.json?access_token=$token&limit=1&language=es',
+      '$_geocodingBase/$longitude,$latitude.json?access_token=$token&limit=1&language=es&country=mx',
     );
     final response = await _client.get(url);
     if (response.statusCode < 200 || response.statusCode >= 300) {

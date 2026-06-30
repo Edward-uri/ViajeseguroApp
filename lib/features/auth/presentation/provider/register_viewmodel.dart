@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/http/api_exception.dart';
@@ -20,6 +22,7 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
 
   final AuthRepository _repository;
   final MunicipiosRepository _municipiosRepository;
+  Timer? _errorTimer;
 
   String _correo = '';
   String _codigo = '';
@@ -53,7 +56,7 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
         canSubmit = _correo.trim().contains('@') && _correo.length >= 5;
         break;
       case RegisterStep.otp:
-        canSubmit = _codigo.length == 4;
+        canSubmit = _codigo.length == 6;
         break;
       case RegisterStep.formPersonal:
         canSubmit = _nombre.trim().isNotEmpty &&
@@ -82,7 +85,7 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
   }
 
   void setCodigo(String v) {
-    if (v.length <= 4) {
+    if (v.length <= 6) {
       _codigo = v;
       _updateCanSubmit();
     }
@@ -122,11 +125,13 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
   void setContrasena(String v) {
     _contrasena = v;
     _updateCanSubmit();
+    state = state.copyWith();
   }
 
   void setConfirmarContrasena(String v) {
     _confirmarContrasena = v;
     _updateCanSubmit();
+    state = state.copyWith();
   }
 
   bool get passwordsMatch => _contrasena == _confirmarContrasena;
@@ -161,8 +166,23 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
   }
 
   void clearError() {
-    if (state.errorMessage == null) return;
+    _errorTimer?.cancel();
+    _errorTimer = null;
     state = state.copyWith(errorMessage: null);
+  }
+
+  void _setError(String message) {
+    _errorTimer?.cancel();
+    state = state.copyWith(errorMessage: message);
+    _errorTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) clearError();
+    });
+  }
+
+  @override
+  void dispose() {
+    _errorTimer?.cancel();
+    super.dispose();
   }
 
   void goBackToEmail() {
@@ -216,26 +236,24 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
   }
   Future<bool> sendOtp() async {
     if (state.step != RegisterStep.email) return false;
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true);
     _updateCanSubmit();
     try {
       await _repository.registerStart(correo: _correo.trim());
       state = state.copyWith(
         isLoading: false,
         step: RegisterStep.otp,
-        errorMessage: null,
       );
       _updateCanSubmit();
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      state = state.copyWith(isLoading: false);
+      _setError(e.message);
       _updateCanSubmit();
       return false;
     } catch (_) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Ocurrio un error inesperado',
-      );
+      state = state.copyWith(isLoading: false);
+      _setError('Ocurrio un error inesperado');
       _updateCanSubmit();
       return false;
     }
@@ -243,7 +261,7 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
 
   Future<bool> verifyOtp() async {
     if (state.step != RegisterStep.otp) return false;
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true);
     _updateCanSubmit();
     try {
       _registrationToken = await _repository.registerVerify(
@@ -253,19 +271,17 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
       state = state.copyWith(
         isLoading: false,
         step: RegisterStep.formPersonal,
-        errorMessage: null,
       );
       _updateCanSubmit();
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      state = state.copyWith(isLoading: false);
+      _setError(e.message);
       _updateCanSubmit();
       return false;
     } catch (_) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Ocurrio un error inesperado',
-      );
+      state = state.copyWith(isLoading: false);
+      _setError('Ocurrio un error inesperado');
       _updateCanSubmit();
       return false;
     }
@@ -273,7 +289,7 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
 
   Future<bool> completeRegistration() async {
     if (state.step != RegisterStep.formAdditional) return false;
-    state = state.copyWith(isLoading: true, errorMessage: null);
+    state = state.copyWith(isLoading: true);
     _updateCanSubmit();
     try {
       await _repository.registerComplete(RegisterParams(
@@ -292,14 +308,13 @@ class RegisterViewModel extends StateNotifier<RegisterViewModelState> {
       state = state.copyWith(isLoading: false);
       return true;
     } on ApiException catch (e) {
-      state = state.copyWith(isLoading: false, errorMessage: e.message);
+      state = state.copyWith(isLoading: false);
+      _setError(e.message);
       _updateCanSubmit();
       return false;
     } catch (_) {
-      state = state.copyWith(
-        isLoading: false,
-        errorMessage: 'Ocurrio un error inesperado',
-      );
+      state = state.copyWith(isLoading: false);
+      _setError('Ocurrio un error inesperado');
       _updateCanSubmit();
       return false;
     }
@@ -325,10 +340,12 @@ class RegisterViewModelState {
   final bool municipiosLoading;
   final bool municipiosLoaded;
 
+  static const _sentinel = Object();
+
   RegisterViewModelState copyWith({
     RegisterStep? step,
     bool? isLoading,
-    String? errorMessage,
+    Object? errorMessage = _sentinel,
     bool? canSubmit,
     List<Municipio>? municipios,
     bool? municipiosLoading,
@@ -337,7 +354,9 @@ class RegisterViewModelState {
     return RegisterViewModelState(
       step: step ?? this.step,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage ?? this.errorMessage,
+      errorMessage: identical(errorMessage, _sentinel)
+          ? this.errorMessage
+          : errorMessage as String?,
       canSubmit: canSubmit ?? this.canSubmit,
       municipios: municipios ?? this.municipios,
       municipiosLoading: municipiosLoading ?? this.municipiosLoading,

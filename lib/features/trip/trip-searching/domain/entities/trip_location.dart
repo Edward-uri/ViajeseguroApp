@@ -6,6 +6,12 @@ class TripLocation {
     this.placeName,
   });
 
+  static const empty = TripLocation(
+    address: '',
+    latitude: 0.0,
+    longitude: 0.0,
+  );
+
   final String address;
   final double latitude;
   final double longitude;

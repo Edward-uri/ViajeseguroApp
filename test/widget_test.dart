@@ -83,6 +83,23 @@ class _FakeProfileRepository implements ProfileRepository {
   @override
   Future<User> getMe() => throw UnimplementedError();
   @override
+  Future<User> updateProfile({
+    String? nombre,
+    String? apellidoPaterno,
+    String? apellidoMaterno,
+    int? idSexo,
+    String? fechaNacimiento,
+    String? telefono,
+  }) =>
+      throw UnimplementedError();
+  @override
+  Future<User> uploadPhotoDirect({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) =>
+      throw UnimplementedError();
+  @override
   Future<ProfilePhotoUploadTicket> requestPhotoUpload({
     required String contentType,
   }) =>

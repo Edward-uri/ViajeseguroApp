@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../theme/theme.dart';
+import '../../core/di/core_module.dart';
+import '../../theme/jala_theme.dart';
+import 'auth_image_provider.dart';
+import 'fade_slide_in.dart';
 
 class JalaSidebarOption {
   const JalaSidebarOption({
@@ -32,6 +36,7 @@ class JalaSidebar extends StatelessWidget {
     required this.sections,
     required this.onLogout,
     this.logoutLabel = 'Cerrar sesion',
+    this.userId,
   });
 
   final String userName;
@@ -40,14 +45,16 @@ class JalaSidebar extends StatelessWidget {
   final List<JalaSidebarSection> sections;
   final VoidCallback onLogout;
   final String logoutLabel;
+  final int? userId;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
     final topPad = MediaQuery.of(context).padding.top;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     return Material(
-      color: const Color(0xFFF6F6F6),
+      color: context.brand.surfaceLight,
       child: SafeArea(
         top: true,
         bottom: false,
@@ -56,23 +63,40 @@ class JalaSidebar extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Menu',
-                style: text.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: JalaBrand.ink,
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 100),
+                child: Text(
+                  'Menu',
+                  style: text.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: onSurface,
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
-              _UserCard(
-                initials: userInitials,
-                name: userName,
-                subtitle: userSubtitle,
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 200),
+                child: _UserCard(
+                  initials: userInitials,
+                  name: userName,
+                  subtitle: userSubtitle,
+                  userId: userId,
+                ),
               ),
               const SizedBox(height: 24),
-              ...sections.map((section) => _SidebarSection(section: section)),
+              ...sections.asMap().entries.map((entry) {
+                final index = entry.key;
+                final section = entry.value;
+                return FadeSlideIn(
+                  delay: Duration(milliseconds: 300 + (index * 150)),
+                  child: _SidebarSection(section: section),
+                );
+              }),
               const SizedBox(height: 16),
-              _LogoutCard(label: logoutLabel, onTap: onLogout),
+              FadeSlideIn(
+                delay: Duration(milliseconds: 300 + (sections.length * 150)),
+                child: _LogoutCard(label: logoutLabel, onTap: onLogout),
+              ),
             ],
           ),
         ),
@@ -86,20 +110,23 @@ class _UserCard extends StatelessWidget {
     required this.initials,
     required this.name,
     required this.subtitle,
+    this.userId,
   });
 
   final String initials;
   final String name;
   final String subtitle;
+  final int? userId;
 
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final apiClient = ProviderScope.containerOf(context).read(apiClientProvider);
 
     return Container(
       height: 96,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: Row(
         children: [
           Container(
@@ -109,14 +136,32 @@ class _UserCard extends StatelessWidget {
               color: JalaBrand.amber,
               shape: BoxShape.circle,
             ),
+            clipBehavior: Clip.antiAlias,
             alignment: Alignment.center,
-            child: Text(
-              initials,
-              style: text.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
+            child: userId != null
+                ? Image(
+                    image: AuthImageProvider(
+                      userId: userId!,
+                      apiClient: apiClient,
+                    ),
+                    fit: BoxFit.cover,
+                    width: 64,
+                    height: 64,
+                    errorBuilder: (_, __, ___) => Text(
+                      initials,
+                      style: text.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  )
+                : Text(
+                    initials,
+                    style: text.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -129,7 +174,7 @@ class _UserCard extends StatelessWidget {
                   style: text.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 19,
-                    color: JalaBrand.ink,
+                    color: context.colors.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -137,7 +182,7 @@ class _UserCard extends StatelessWidget {
                   subtitle,
                   style: text.bodyMedium?.copyWith(
                     fontSize: 14,
-                    color: const Color(0xFF6B6661),
+                    color: context.brand.greyDark,
                   ),
                 ),
               ],
@@ -169,23 +214,23 @@ class _SidebarSection extends StatelessWidget {
               fontWeight: FontWeight.w600,
               fontSize: 12,
               letterSpacing: 0.06 * 12,
-              color: const Color(0xFF6B6661),
+              color: context.brand.greyDark,
             ),
           ),
         ),
         Container(
-          decoration: _cardDecoration(),
+          decoration: _cardDecoration(context),
           child: Column(
             children: [
               for (int i = 0; i < section.options.length; i++) ...[
                 _OptionTile(option: section.options[i]),
                 if (i < section.options.length - 1)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 56),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 56),
                     child: Divider(
                       height: 1,
                       thickness: 1,
-                      color: Color(0xFFF0F0F0),
+                      color: context.colors.outlineVariant,
                     ),
                   ),
               ],
@@ -206,12 +251,13 @@ class _OptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     final color = option.isDestructive
-        ? const Color(0xFFD84315)
-        : JalaBrand.ink;
+        ? context.brand.destructive
+        : onSurface;
     final iconColor = option.isDestructive
-        ? const Color(0xFFD84315)
-        : JalaBrand.ink;
+        ? context.brand.destructive
+        : onSurface;
 
     return ListTile(
       onTap: option.onTap,
@@ -225,10 +271,10 @@ class _OptionTile extends StatelessWidget {
           color: color,
         ),
       ),
-      trailing: const Icon(
+      trailing: Icon(
         Icons.chevron_right_rounded,
         size: 20,
-        color: Color(0xFFC4C4C4),
+        color: context.colors.outline,
       ),
     );
   }
@@ -245,43 +291,43 @@ class _LogoutCard extends StatelessWidget {
     final text = Theme.of(context).textTheme;
 
     return Container(
-      decoration: _cardDecoration(),
+      decoration: _cardDecoration(context),
       child: ListTile(
         onTap: onTap,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        leading: const Icon(
+        leading: Icon(
           Icons.logout_rounded,
           size: 24,
-          color: Color(0xFFD84315),
+          color: context.brand.destructive,
         ),
         title: Text(
           label,
           style: text.bodyLarge?.copyWith(
             fontWeight: FontWeight.w600,
             fontSize: 16,
-            color: const Color(0xFFD84315),
+            color: context.brand.destructive,
           ),
         ),
-        trailing: const Icon(
+        trailing: Icon(
           Icons.chevron_right_rounded,
           size: 20,
-          color: Color(0xFFC4C4C4),
+          color: context.colors.outline,
         ),
       ),
     );
   }
 }
 
-BoxDecoration _cardDecoration() {
+BoxDecoration _cardDecoration(BuildContext context) {
   return BoxDecoration(
-    color: Colors.white,
+    color: context.colors.surfaceContainerLow,
     borderRadius: BorderRadius.circular(16),
-    border: Border.all(color: const Color(0xFFECECEC), width: 1),
-    boxShadow: const [
+    border: Border.all(color: context.brand.divider, width: 1),
+    boxShadow: [
       BoxShadow(
-        color: Color.fromRGBO(26, 20, 15, 0.06),
+        color: context.colors.onSurface.withValues(alpha: 0.06),
         blurRadius: 16,
-        offset: Offset(0, 4),
+        offset: const Offset(0, 4),
       ),
     ],
   );

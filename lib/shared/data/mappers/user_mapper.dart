@@ -19,6 +19,10 @@ class UserMapper {
       fechaRegistro: json['fechaRegistro'] != null
           ? DateTime.tryParse(json['fechaRegistro'].toString())
           : null,
+      idSexo: _parseNullableInt(json['idSexo']),
+      fechaNacimiento: json['fechaNacimiento'] != null
+          ? DateTime.tryParse(json['fechaNacimiento'].toString())
+          : null,
     );
   }
 
@@ -35,6 +39,8 @@ class UserMapper {
         'idMunicipio': user.idMunicipio,
         'fotoPerfilUrl': user.fotoPerfilUrl,
         'fechaRegistro': user.fechaRegistro?.toIso8601String(),
+        'idSexo': user.idSexo,
+        'fechaNacimiento': user.fechaNacimiento?.toIso8601String(),
       };
 
   static int _parseInt(dynamic value) {

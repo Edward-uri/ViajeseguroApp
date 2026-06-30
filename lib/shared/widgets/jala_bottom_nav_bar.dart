@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../theme/theme.dart';
+import '../../theme/jala_theme.dart';
 
 class JalaNavDestination {
   const JalaNavDestination({
@@ -18,15 +18,11 @@ class JalaBottomNavBar extends StatelessWidget {
     required this.selectedIndex,
     required this.onTabSelected,
     required this.destinations,
-    this.activeColor = JalaBrand.amber,
-    this.inactiveColor = const Color(0xFF9A9A9A),
   });
 
   final int selectedIndex;
   final ValueChanged<int> onTabSelected;
   final List<JalaNavDestination> destinations;
-  final Color activeColor;
-  final Color inactiveColor;
 
   @override
   Widget build(BuildContext context) {
@@ -34,10 +30,10 @@ class JalaBottomNavBar extends StatelessWidget {
     return Container(
       height: 84 + bottomPadding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: context.colors.onSurface.withValues(alpha: 0.08),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),
@@ -54,8 +50,6 @@ class JalaBottomNavBar extends StatelessWidget {
                   icon: destinations[index].icon,
                   label: destinations[index].label,
                   isActive: selectedIndex == index,
-                  activeColor: activeColor,
-                  inactiveColor: inactiveColor,
                   onTap: () => onTabSelected(index),
                 ),
               ),
@@ -73,8 +67,6 @@ class _NavButton extends StatelessWidget {
     required this.icon,
     required this.isActive,
     required this.onTap,
-    required this.activeColor,
-    required this.inactiveColor,
     this.label,
   });
 
@@ -82,11 +74,12 @@ class _NavButton extends StatelessWidget {
   final String? label;
   final bool isActive;
   final VoidCallback onTap;
-  final Color activeColor;
-  final Color inactiveColor;
 
   @override
   Widget build(BuildContext context) {
+    final activeColor = JalaBrand.amber;
+    final inactiveColor = context.brand.greyDark;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -109,8 +102,8 @@ class _NavButton extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 4),
                 width: 4,
                 height: 4,
-                decoration: BoxDecoration(
-                  color: activeColor,
+                decoration: const BoxDecoration(
+                  color: JalaBrand.amber,
                   shape: BoxShape.circle,
                 ),
               ),

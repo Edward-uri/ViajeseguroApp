@@ -8,6 +8,14 @@ class TripFare {
     this.currency = 'MXN',
   });
 
+  static const empty = TripFare(
+    baseFare: 0,
+    distanceFare: 0,
+    totalFare: 0,
+    distance: 0,
+    duration: 0,
+  );
+
   final double baseFare;
   final double distanceFare;
   final double totalFare;
