@@ -30,23 +30,12 @@ final apiClientProvider = Provider<ApiClient>((ref) {
   );
 });
 
-/// Provider global del SocketService.
-/// El token se lee dinámicamente desde el ApiClient (que lo cachea en memoria).
-/// Si el token expira, el socket dispara un refresh via ApiClient y reconecta.
+
 final socketServiceProvider = Provider<SocketService>((ref) {
   final client = ref.read(apiClientProvider);
   final service = SocketService(
     tokenProvider: () => client.currentToken ?? '',
-    onTokenExpired: () async {
-      // El ApiClient._tryRefreshToken es privado; usamos un truco:
-      // hacemos un GET ligero que dispara el refresh si el token expiró.
-      try {
-        await client.get('/api/auth/refresh', auth: false);
-        return client.currentToken != null && client.currentToken!.isNotEmpty;
-      } catch (_) {
-        return false;
-      }
-    },
+    onTokenExpired: () => client.refreshSession(),
   );
   ref.onDispose(() => service.dispose());
   return service;

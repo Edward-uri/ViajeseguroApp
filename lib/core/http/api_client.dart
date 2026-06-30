@@ -24,11 +24,13 @@ class ApiClient {
   final String baseUrl;
   final OnAuthFailure? onAuthFailure;
 
-  bool _isRefreshing = false;
 
-  /// Último token leído del storage (cache para acceso síncrono, ej: SocketService).
+  Future<bool>? _refreshing;
+
   String? _cachedToken;
   String? get currentToken => _cachedToken;
+
+  Future<bool> refreshSession() => _tryRefreshToken();
 
   Future<Map<String, dynamic>> get(String path, {bool auth = true}) {
     return _sendRequest(
@@ -142,10 +144,12 @@ class ApiClient {
     );
   }
 
-  Future<bool> _tryRefreshToken() async {
-    if (_isRefreshing) return false;
-    _isRefreshing = true;
+  Future<bool> _tryRefreshToken() {
+    // Si ya hay un refresh en curso, comparte ese mismo Future (single-flight).
+    return _refreshing ??= _doRefreshToken().whenComplete(() => _refreshing = null);
+  }
 
+  Future<bool> _doRefreshToken() async {
     try {
       final refreshToken = await _authStorage.readRefreshToken();
       if (refreshToken == null || refreshToken.isEmpty) {
@@ -181,6 +185,7 @@ class ApiClient {
       }
 
       await _authStorage.writeToken(newAccessToken);
+      _cachedToken = newAccessToken;
       if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
         await _authStorage.writeRefreshToken(newRefreshToken);
       }
@@ -189,8 +194,6 @@ class ApiClient {
       await _authStorage.clear();
       _notifyAuthFailure();
       return false;
-    } finally {
-      _isRefreshing = false;
     }
   }
 
