@@ -83,23 +83,30 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   Future<void> _loadPinImages() async {
     if (_pinImagesLoaded || _mapboxMap == null) return;
     try {
-      await addSvgPinToMap(
+      await addPngPinToMap(
         _mapboxMap!,
-        'pin-azul',
-        'lib/shared/icons/Pin-Azul.svg',
+        'pin-verde',
+        'lib/shared/icons/map-icons/Pin-Verde.png',
         width: 30,
         height: 36,
       );
-      await addSvgPinToMap(
+      await addPngPinToMap(
         _mapboxMap!,
         'pin-naranja',
-        'lib/shared/icons/Pin-Naranja.svg',
+        'lib/shared/icons/map-icons/Pin-Naranja.png',
         width: 30,
         height: 36,
+      );
+      await addPngPinToMap(
+        _mapboxMap!,
+        'mototaxi-mapa',
+        'lib/shared/icons/map-icons/MototaxiMapa.png',
+        width: 40,
+        height: 40,
       );
       _pinImagesLoaded = true;
     } catch (e) {
-      debugPrint('[TripInProgress] Error cargando pines SVG: $e');
+      debugPrint('[TripInProgress] Error cargando pines PNG: $e');
     }
   }
 
@@ -167,16 +174,16 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     try {
       _pinMarkerManager!.deleteAll();
 
-      // Pin de origen (azul) — SVG
+      // Pin de origen (verde) — PNG
       _pinMarkerManager!.create(PointAnnotationOptions(
         geometry: Point(
           coordinates: Position(trip.origin.longitude, trip.origin.latitude),
         ),
-        iconImage: 'pin-azul',
+        iconImage: 'pin-verde',
         iconSize: 1.0,
       ));
 
-      // Pin de destino (naranja) — SVG
+      // Pin de destino (naranja) — PNG
       _pinMarkerManager!.create(PointAnnotationOptions(
         geometry: Point(
           coordinates: Position(trip.destination.longitude, trip.destination.latitude),

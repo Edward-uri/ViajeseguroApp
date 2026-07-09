@@ -72,84 +72,87 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              Icon(Icons.check_circle_rounded, color: JalaBrand.success, size: 64),
-              const SizedBox(height: 16),
-              Text(
-                'Viaje completado',
-                textAlign: TextAlign.center,
-                style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '¿Cómo estuvo tu viaje con $nombre?',
-                textAlign: TextAlign.center,
-                style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (i) {
-                  final value = i + 1;
-                  return IconButton(
-                    onPressed: _enviando
-                        ? null
-                        : () => setState(() {
-                              _rating = value;
-                              _error = null;
-                            }),
-                    iconSize: 40,
-                    icon: Icon(
-                      value <= _rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                      color: JalaBrand.amber,
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _comentario,
-                enabled: !_enviando,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  hintText: 'Deja un comentario (opcional)',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 48),
+                Icon(Icons.check_circle_rounded, color: JalaBrand.success, size: 64),
+                const SizedBox(height: 16),
+                Text(
+                  'Viaje completado',
+                  textAlign: TextAlign.center,
+                  style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                 ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 4),
-                Text(_error!, style: TextStyle(color: scheme.error, fontSize: 13)),
-              ],
-              const Spacer(),
-              SizedBox(
-                height: 54,
-                child: ElevatedButton(
-                  onPressed: _enviando ? null : _enviar,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: JalaBrand.amber,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
+                const SizedBox(height: 6),
+                Text(
+                  '¿Cómo estuvo tu viaje con $nombre?',
+                  textAlign: TextAlign.center,
+                  style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    final value = i + 1;
+                    return IconButton(
+                      onPressed: _enviando
+                          ? null
+                          : () => setState(() {
+                                _rating = value;
+                                _error = null;
+                              }),
+                      iconSize: 40,
+                      icon: Icon(
+                        value <= _rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                        color: JalaBrand.amber,
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _comentario,
+                  enabled: !_enviando,
+                  maxLines: 3,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    hintText: 'Deja un comentario (opcional)',
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: Text(
-                    _enviando ? 'Enviando…' : 'Enviar calificación',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 4),
+                  Text(_error!, style: TextStyle(color: scheme.error, fontSize: 13)),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _enviando ? null : _enviar,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: JalaBrand.amber,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      _enviando ? 'Enviando…' : 'Enviar calificación',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: _enviando ? null : _irAlHome,
-                child: const Text('Omitir'),
-              ),
-            ],
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _enviando ? null : _irAlHome,
+                  child: const Text('Omitir'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
