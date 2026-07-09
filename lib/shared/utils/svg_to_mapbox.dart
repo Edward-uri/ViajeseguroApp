@@ -49,3 +49,32 @@ Future<void> addSvgPinToMap(
     debugPrint('[SvgToMapbox] Error cargando $imageId: $e');
   }
 }
+
+/// Carga un PNG como imagen de estilo en el mapa Mapbox.
+///
+/// Lee el PNG desde assets y lo registra con [imageId] en el estilo del mapa.
+/// Después se puede usar en `PointAnnotationOptions(iconImage: imageId)`.
+Future<void> addPngPinToMap(
+  MapboxMap map,
+  String imageId,
+  String pngAssetPath, {
+  int width = 30,
+  int height = 36,
+}) async {
+  try {
+    final data = await rootBundle.load(pngAssetPath);
+    final bytes = data.buffer.asUint8List();
+
+    await map.style.addStyleImage(
+      imageId,
+      1.0,
+      MbxImage(width: width, height: height, data: bytes),
+      false,
+      const <ImageStretches?>[],
+      const <ImageStretches?>[],
+      null,
+    );
+  } catch (e) {
+    debugPrint('[PngToMapbox] Error cargando $imageId: $e');
+  }
+}
