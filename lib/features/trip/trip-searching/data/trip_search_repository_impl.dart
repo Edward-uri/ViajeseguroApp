@@ -1,11 +1,14 @@
+import '../../../../core/http/api_client.dart';
+import '../../../../core/routes/api_routes.dart';
 import '../domain/entities/trip_location.dart';
 import '../domain/repositories/trip_search_repository.dart';
 import 'remote/mapbox_api.dart';
 
 class TripSearchRepositoryImpl implements TripSearchRepository {
-  TripSearchRepositoryImpl(this._mapboxApi);
+  TripSearchRepositoryImpl(this._mapboxApi, this._api);
 
   final MapboxApi _mapboxApi;
+  final ApiClient _api;
 
   @override
   Future<List<TripLocation>> searchAddress(String query) async {
@@ -66,12 +69,30 @@ class TripSearchRepositoryImpl implements TripSearchRepository {
     required double originLng,
     required double destinationLat,
     required double destinationLng,
-  }) {
-    return _mapboxApi.getRoute(
-      originLat: originLat,
-      originLng: originLng,
-      destinationLat: destinationLat,
-      destinationLng: destinationLng,
-    );
+  }) async {
+    try {
+      final response = await _api.get(
+        '${ApiRoutes.viajesRuta}'
+        '?fromLat=$originLat&fromLng=$originLng'
+        '&toLat=$destinationLat&toLng=$destinationLng',
+        auth: true,
+      );
+      final ruta = response['ruta'] as Map<String, dynamic>?;
+      if (ruta == null) return const [];
+      final coords = ruta['coordinates'] as List<dynamic>?;
+      if (coords == null) return const [];
+      return coords
+          .map((c) => (c as List<dynamic>)
+              .map((v) => (v as num).toDouble())
+              .toList())
+          .toList();
+    } catch (_) {
+      return _mapboxApi.getRoute(
+        originLat: originLat,
+        originLng: originLng,
+        destinationLat: destinationLat,
+        destinationLng: destinationLng,
+      );
+    }
   }
 }

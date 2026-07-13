@@ -1,6 +1,7 @@
 import '../../../../core/http/api_client.dart';
 import '../../../../core/routes/routes.dart';
 import '../../domain/entities/municipio.dart';
+import '../../domain/entities/tarifa_zona.dart';
 
 class MunicipiosApi {
   MunicipiosApi(this._api);
@@ -14,6 +15,19 @@ class MunicipiosApi {
     return data
         .whereType<Map<String, dynamic>>()
         .map(Municipio.fromJson)
+        .toList();
+  }
+
+  Future<List<TarifaZona>> fetchTarifas(int idMunicipio) async {
+    final response = await _api.get(
+      ApiRoutes.municipiosTarifas(idMunicipio),
+      auth: false,
+    );
+    final data = response['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(TarifaZona.fromJson)
         .toList();
   }
 }

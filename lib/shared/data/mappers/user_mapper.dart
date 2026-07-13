@@ -4,16 +4,17 @@ class UserMapper {
   const UserMapper._();
 
   static User fromJson(Map<String, dynamic> json) {
+    final persona = json['persona'] as Map<String, dynamic>?;
     return User(
       idUsuario: _parseInt(json['idUsuario'] ?? json['id'] ?? 0),
-      telefono: (json['telefono'] ?? json['phone'] ?? '').toString(),
-      correoElectronico: json['correoElectronico'] as String? ?? json['correo'] as String?,
+      telefono: (json['telefono'] ?? persona?['telefono'] ?? json['phone'] ?? '').toString(),
+      correoElectronico: json['correoElectronico'] as String? ?? persona?['correo'] as String? ?? json['correo'] as String?,
       rol: (json['rol'] ?? json['role'] ?? 'pasajero').toString(),
       estadoCuenta: (json['estadoCuenta'] ?? json['estado'] ?? 'activo').toString(),
       telefonoVerificado: json['telefonoVerificado'] as bool? ?? false,
-      nombre: json['nombre'] as String? ?? json['name'] as String?,
-      apellidoPaterno: json['apellidoPaterno'] as String?,
-      apellidoMaterno: json['apellidoMaterno'] as String?,
+      nombre: json['nombre'] as String? ?? persona?['nombre'] as String? ?? json['name'] as String?,
+      apellidoPaterno: json['apellidoPaterno'] as String? ?? persona?['apellidoPaterno'] as String?,
+      apellidoMaterno: json['apellidoMaterno'] as String? ?? persona?['apellidoMaterno'] as String?,
       idMunicipio: _parseNullableInt(json['idMunicipio']),
       fotoPerfilUrl: json['fotoPerfilUrl'] as String? ?? json['foto'] as String?,
       fechaRegistro: json['fechaRegistro'] != null
@@ -22,7 +23,9 @@ class UserMapper {
       idSexo: _parseNullableInt(json['idSexo']),
       fechaNacimiento: json['fechaNacimiento'] != null
           ? DateTime.tryParse(json['fechaNacimiento'].toString())
-          : null,
+          : persona?['fechaNacimiento'] != null
+              ? DateTime.tryParse(persona!['fechaNacimiento'].toString())
+              : null,
     );
   }
 

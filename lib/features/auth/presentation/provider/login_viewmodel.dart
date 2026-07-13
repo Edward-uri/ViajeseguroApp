@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/auth/current_user_provider.dart';
@@ -141,9 +142,11 @@ class LoginViewModel extends StateNotifier<LoginViewModelState> {
   void _registrarDispositivo() {
     Future.microtask(() async {
       try {
+        final token = await FirebaseMessaging.instance.getToken();
+        if (token == null || token.isEmpty) return;
         await _repository.registrarDispositivo(
           plataforma: Platform.operatingSystem,
-          version: Platform.operatingSystemVersion,
+          tokenFcm: token,
         );
       } catch (_) {}
     });

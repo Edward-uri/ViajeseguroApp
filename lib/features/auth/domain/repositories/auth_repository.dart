@@ -26,8 +26,6 @@ abstract class AuthRepository {
 
   Future<void> registrarDispositivo({
     required String plataforma,
-    required String version,
-    String? modelo,
-    String? tokenPush,
+    required String tokenFcm,
   });
 }

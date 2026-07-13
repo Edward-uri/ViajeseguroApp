@@ -8,6 +8,7 @@ import 'package:viajeseguroapp/core/storage/auth_storage.dart';
 import 'package:viajeseguroapp/features/auth/di/auth_module.dart';
 import 'package:viajeseguroapp/features/auth/domain/entities/municipio.dart';
 import 'package:viajeseguroapp/features/auth/domain/entities/register_params.dart';
+import 'package:viajeseguroapp/features/auth/domain/entities/tarifa_zona.dart';
 import 'package:viajeseguroapp/features/auth/domain/repositories/auth_repository.dart';
 import 'package:viajeseguroapp/features/auth/domain/repositories/municipios_repository.dart';
 import 'package:viajeseguroapp/features/auth/domain/services/mock_location_detector.dart';
@@ -69,7 +70,7 @@ class _FakeAuthRepository implements AuthRepository {
   @override
   Future<User?> getCurrentUser() async => null;
   @override
-  Future<void> registrarDispositivo({required String plataforma, required String version, String? modelo, String? tokenPush}) async {}
+  Future<void> registrarDispositivo({required String plataforma, required String tokenFcm}) async {}
 }
 
 class _FakeMunicipiosRepository implements MunicipiosRepository {
@@ -77,6 +78,8 @@ class _FakeMunicipiosRepository implements MunicipiosRepository {
   Future<List<Municipio>> getMunicipios() async => const [
     Municipio(idMunicipio: 1, nombre: 'Suchiapa', estado: 'Chiapas'),
   ];
+  @override
+  Future<List<TarifaZona>> getTarifas(int idMunicipio) async => const [];
 }
 
 class _FakeProfileRepository implements ProfileRepository {

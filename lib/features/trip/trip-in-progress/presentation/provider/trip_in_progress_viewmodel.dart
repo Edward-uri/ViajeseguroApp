@@ -33,16 +33,12 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
   void setTrip(Trip trip) {
     state = state.copyWith(trip: trip, isLoading: false);
 
-    // Socket events
     _listenSocketEvents(trip.id);
 
-    // Tracking de ubicación del conductor
     _startTracking(trip.id);
 
-    // Comparte mi ubicación con el conductor (para que me vea acercarme).
     _trackingService.startSharingLocation(trip.id);
 
-    // Polling como fallback (cada 10s, no 5s — el socket es primario)
     _startPolling(trip.id);
   }
 

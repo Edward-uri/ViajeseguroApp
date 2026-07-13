@@ -8,17 +8,13 @@ class DispositivosApi {
 
   Future<Map<String, dynamic>> registrar({
     required String plataforma,
-    required String version,
-    String? modelo,
-    String? tokenPush,
+    required String tokenFcm,
   }) =>
       _api.post(
         ApiRoutes.dispositivos,
         body: <String, dynamic>{
           'plataforma': plataforma,
-          'version': version,
-          if (modelo != null) 'modelo': modelo,
-          if (tokenPush != null) 'tokenPush': tokenPush,
+          'tokenFcm': tokenFcm,
         },
         auth: true,
       );

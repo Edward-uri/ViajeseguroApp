@@ -158,8 +158,10 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   void _drawRoute(TripLocation origin, TripLocation destination) async {
     _polylineManager?.deleteAll();
 
-    // Respaldo (línea recta) si OSRM no responde: la ruta y los pines deben
-    // verse siempre mientras se confirma el viaje.
+    // Pines de origen y destino INMEDIATAMENTE — sin esperar la ruta.
+    _drawOriginDestinationPins(origin, destination);
+
+    // Respaldo (línea recta) si el backend no responde.
     var coordinates = <Position>[
       Position(origin.longitude, origin.latitude),
       Position(destination.longitude, destination.latitude),
@@ -176,7 +178,7 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
         coordinates = routeCoords.map((c) => Position(c[0], c[1])).toList();
       }
     } catch (e) {
-      debugPrint('[TripSearching] OSRM falló, uso línea recta: $e');
+      debugPrint('[TripSearching] Backend route falló, uso línea recta: $e');
     }
 
     try {
@@ -189,9 +191,6 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
     } catch (e) {
       debugPrint('[TripSearching] No se pudo dibujar la ruta: $e');
     }
-
-    // Dibujar pines de origen y destino en el mapa
-    _drawOriginDestinationPins(origin, destination);
 
     _mapboxMap?.flyTo(
       CameraOptions(

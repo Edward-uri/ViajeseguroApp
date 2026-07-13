@@ -114,8 +114,10 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     if (_routeDrawn) return;
     final trip = widget.trip;
 
-    // Respaldo (línea recta) si OSRM no responde: la ruta y los pines SIEMPRE
-    // deben verse mientras haya un viaje activo.
+    // Pines de origen y destino INMEDIATAMENTE — sin esperar la ruta.
+    _drawOriginDestinationPins();
+
+    // Respaldo (línea recta) si el backend no responde.
     var coordinates = <Position>[
       Position(trip.origin.longitude, trip.origin.latitude),
       Position(trip.destination.longitude, trip.destination.latitude),
@@ -132,7 +134,7 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
         coordinates = routeCoords.map((c) => Position(c[0], c[1])).toList();
       }
     } catch (e) {
-      debugPrint('[TripInProgress] OSRM falló, uso línea recta: $e');
+      debugPrint('[TripInProgress] Backend route falló, uso línea recta: $e');
     }
 
     try {
@@ -146,9 +148,6 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     } catch (e) {
       debugPrint('[TripInProgress] No se pudo dibujar la ruta: $e');
     }
-
-    // Los pines de origen/destino se dibujan siempre, haya o no ruta de OSRM.
-    _drawOriginDestinationPins();
   }
 
   void _drawOriginDestinationPins() {

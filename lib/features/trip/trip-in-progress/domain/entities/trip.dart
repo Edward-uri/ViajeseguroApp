@@ -20,6 +20,7 @@ class Trip {
     this.idConductor,
     this.idVehiculo,
     this.idMunicipio,
+    this.idZonaDestino,
     this.tipoServicio = 'viaje',
     this.distanciaKm,
     this.tarifaEstimada = false,
@@ -27,8 +28,10 @@ class Trip {
     this.driverName,
     this.driverPhone,
     this.driverRating,
+    this.driverPhotoUrl,
     this.vehicleInfo,
     this.vehiclePlaca,
+    this.vehicleYear,
     this.fechaSolicitud,
     this.fechaAceptacion,
     this.fechaInicio,
@@ -47,6 +50,7 @@ class Trip {
   final int? idConductor;
   final int? idVehiculo;
   final int? idMunicipio;
+  final int? idZonaDestino;
   final String tipoServicio;
   final double? distanciaKm;
   final bool tarifaEstimada;
@@ -54,8 +58,10 @@ class Trip {
   final String? driverName;
   final String? driverPhone;
   final double? driverRating;
+  final String? driverPhotoUrl;
   final String? vehicleInfo;
   final String? vehiclePlaca;
+  final int? vehicleYear;
   final DateTime? fechaSolicitud;
   final DateTime? fechaAceptacion;
   final DateTime? fechaInicio;
@@ -75,10 +81,12 @@ class Trip {
     final driverName = conductor?['nombre'] as String? ?? json['driverName'] as String?;
     final driverPhone = conductor?['telefono'] as String? ?? json['driverPhone'] as String?;
     final driverRating = (conductor?['calificacion'] as num?)?.toDouble();
+    final driverPhotoUrl = conductor?['fotoUrl'] as String?;
 
     // Vehiculo (el backend devuelve modelo/color/anio/placa; no hay "marca").
     final vehiculo = json['vehiculo'] as Map<String, dynamic>?;
     final vehiclePlaca = vehiculo?['placa'] as String?;
+    final vehicleYear = (vehiculo?['anio'] as num?)?.toInt();
     final vehicleInfo = vehiculo != null
         ? [vehiculo['modelo'], vehiculo['color']]
             .where((v) => v != null && v.toString().trim().isNotEmpty)
@@ -91,6 +99,7 @@ class Trip {
       idConductor: (json['idConductor'] as num?)?.toInt(),
       idVehiculo: (json['idVehiculo'] as num?)?.toInt(),
       idMunicipio: (json['idMunicipio'] as num?)?.toInt(),
+      idZonaDestino: (json['idZonaDestino'] as num?)?.toInt(),
       origin: TripLocation(
         address: (origen['texto'] ?? 'Origen').toString(),
         latitude: (origen['lat'] as num?)?.toDouble() ?? 0.0,
@@ -117,8 +126,10 @@ class Trip {
       driverName: driverName,
       driverPhone: driverPhone,
       driverRating: driverRating,
+      driverPhotoUrl: driverPhotoUrl,
       vehicleInfo: vehicleInfo,
       vehiclePlaca: vehiclePlaca,
+      vehicleYear: vehicleYear,
       fechaSolicitud: _parseDate(json['fechaSolicitud']),
       fechaAceptacion: _parseDate(json['fechaAceptacion']),
       fechaInicio: _parseDate(json['fechaInicio']),
@@ -165,8 +176,10 @@ class Trip {
     String? driverName,
     String? driverPhone,
     double? driverRating,
+    String? driverPhotoUrl,
     String? vehicleInfo,
     String? vehiclePlaca,
+    int? vehicleYear,
     DateTime? fechaAceptacion,
     DateTime? fechaInicio,
     DateTime? fechaFin,
@@ -184,6 +197,7 @@ class Trip {
       idConductor: idConductor ?? this.idConductor,
       idVehiculo: idVehiculo ?? this.idVehiculo,
       idMunicipio: idMunicipio,
+      idZonaDestino: idZonaDestino,
       tipoServicio: tipoServicio,
       distanciaKm: distanciaKm,
       tarifaEstimada: tarifaEstimada,
@@ -191,8 +205,10 @@ class Trip {
       driverName: driverName ?? this.driverName,
       driverPhone: driverPhone ?? this.driverPhone,
       driverRating: driverRating ?? this.driverRating,
+      driverPhotoUrl: driverPhotoUrl ?? this.driverPhotoUrl,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
       vehiclePlaca: vehiclePlaca ?? this.vehiclePlaca,
+      vehicleYear: vehicleYear ?? this.vehicleYear,
       fechaSolicitud: fechaSolicitud,
       fechaAceptacion: fechaAceptacion ?? this.fechaAceptacion,
       fechaInicio: fechaInicio ?? this.fechaInicio,

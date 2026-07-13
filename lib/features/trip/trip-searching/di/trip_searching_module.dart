@@ -10,5 +10,8 @@ final mapboxApiProvider = Provider<MapboxApi>((ref) {
 });
 
 final tripSearchRepositoryProvider = Provider<TripSearchRepository>((ref) {
-  return TripSearchRepositoryImpl(ref.watch(mapboxApiProvider));
+  return TripSearchRepositoryImpl(
+    ref.watch(mapboxApiProvider),
+    ref.watch(apiClientProvider),
+  );
 });

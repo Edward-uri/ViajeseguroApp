@@ -25,7 +25,7 @@ class _StubAuthRepository implements AuthRepository {
   @override
   Future<User?> getCurrentUser() async => null;
   @override
-  Future<void> registrarDispositivo({required String plataforma, required String version, String? modelo, String? tokenPush}) async {}
+  Future<void> registrarDispositivo({required String plataforma, required String tokenFcm}) async {}
 }
 
 class _StubLocationDetector implements MockLocationDetector {

@@ -10,12 +10,14 @@ abstract class ApiRoutes {
   static const String logout = '$authBase/logout';
 
   static const String municipios = '/api/municipios';
+  static String municipiosTarifas(int id) => '$municipios/$id/tarifas';
 
   static const String viajesBase = '/api/viajes';
   static const String viajes = viajesBase;
   static const String viajesEstimar = '$viajesBase/estimar';
   static const String viajesMios = '$viajesBase/mios';
   static const String viajesActivo = '$viajesBase/activo';
+  static const String viajesRuta = '$viajesBase/ruta';
   static const String viajeCancelar = '$viajesBase/{id}/cancelar';
 
   static const String dispositivos = '/api/dispositivos';

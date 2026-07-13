@@ -91,16 +91,12 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> registrarDispositivo({
     required String plataforma,
-    required String version,
-    String? modelo,
-    String? tokenPush,
+    required String tokenFcm,
   }) async {
     try {
       await _dispositivosApi.registrar(
         plataforma: plataforma,
-        version: version,
-        modelo: modelo,
-        tokenPush: tokenPush,
+        tokenFcm: tokenFcm,
       );
     } catch (_) {
     }
