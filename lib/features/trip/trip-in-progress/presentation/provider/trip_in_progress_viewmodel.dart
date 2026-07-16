@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/di/core_module.dart';
 import '../../../../../core/http/api_exception.dart';
+import '../../../../../core/notifications/trip_notification_service.dart';
 import '../../../../../core/websocket/socket_service.dart';
 import '../../../trip-searching/domain/entities/trip_location.dart';
 import '../../../trip-searching/domain/entities/trip_fare.dart';
@@ -19,16 +20,19 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     this._tripRepository,
     this._trackingService,
     this._socketService,
+    this._tripNotification,
   ) : super(const TripInProgressViewModelState());
 
   final TripRepository _tripRepository;
   final TripTrackingService _trackingService;
   final SocketService _socketService;
+  final TripNotificationService _tripNotification;
 
   Timer? _pollingTimer;
   StreamSubscription<DriverPosition>? _positionSubscription;
   StreamSubscription<TripSocketEvent>? _acceptedSub;
   StreamSubscription<TripSocketEvent>? _stateChangeSub;
+  TripStatus? _notifiedStatus;
 
   void setTrip(Trip trip) {
     state = state.copyWith(trip: trip, isLoading: false);
@@ -93,11 +97,54 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
         trip: updatedTrip,
         driverPosition: state.driverPosition,
       );
+      _syncTripNotification();
 
       if (parsed == TripStatus.completado) {
         _cleanup();
       }
     });
+  }
+
+  /// Único punto que mantiene la notificación del viaje sincronizada con el
+  /// estado: título/ETA por fase, alerta (sonido+vibración) solo al cambiar
+  /// de fase, y se quita cuando el viaje deja de estar activo.
+  void _syncTripNotification() {
+    final status = state.trip?.status;
+    if (status != TripStatus.aceptado && status != TripStatus.enCurso) {
+      if (_notifiedStatus != null) {
+        _notifiedStatus = null;
+        if (status == TripStatus.completado) {
+          // Viaje terminado: aviso con sonido y vibración.
+          _tripNotification.finish(
+            title: 'Viaje completado',
+            body: 'Llegaste a tu destino. ¡Gracias por viajar con Jala!',
+          );
+        } else {
+          _tripNotification.cancel();
+        }
+      }
+      return;
+    }
+
+    final eta = state.etaMin;
+    final String title;
+    final String body;
+    if (status == TripStatus.aceptado) {
+      title = 'Tu mototaxi está en camino';
+      body = eta != null ? 'Llega en ~$eta min' : 'Tu conductor va hacia ti';
+    } else {
+      title = 'Viaje en curso';
+      body = eta != null
+          ? 'Llegas a tu destino en ~$eta min'
+          : 'Rumbo a tu destino';
+    }
+
+    _tripNotification.update(
+      title: title,
+      body: body,
+      alert: status != _notifiedStatus,
+    );
+    _notifiedStatus = status;
   }
 
   void _startPolling(String tripId) {
@@ -116,7 +163,22 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
         if (status != TripStatus.aceptado && status != TripStatus.enCurso) {
           return;
         }
-        state = state.copyWith(driverPosition: pos);
+        // El backend recalcula el ETA cada ~15s; si un tick viene sin ETA
+        // (OSRM falló), conservar el último conocido para que no parpadee.
+        final prev = state.driverPosition;
+        state = state.copyWith(
+          driverPosition: DriverPosition(
+            latitude: pos.latitude,
+            longitude: pos.longitude,
+            heading: pos.heading,
+            speed: pos.speed,
+            timestamp: pos.timestamp,
+            etaPickupMin: pos.etaPickupMin ?? prev?.etaPickupMin,
+            etaDestinationMin:
+                pos.etaDestinationMin ?? prev?.etaDestinationMin,
+          ),
+        );
+        _syncTripNotification();
       },
       onError: (e) {
         debugPrint('[TripInProgress] Error tracking: $e');
@@ -128,6 +190,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     try {
       final trip = await _tripRepository.getTripById(tripId);
       state = state.copyWith(trip: trip, isLoading: false);
+      _syncTripNotification();
 
       if (trip.status == TripStatus.completado) {
         _cleanup();
@@ -145,6 +208,8 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     _stopTracking();
     _acceptedSub?.cancel();
     _stateChangeSub?.cancel();
+    _notifiedStatus = null;
+    _tripNotification.cancel();
   }
 
   void _stopTracking() {
@@ -162,6 +227,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
       await _tripRepository.cancelTrip(state.trip!.id, motivo: motivo);
       final cancelledTrip = state.trip!.copyWith(status: TripStatus.cancelado);
       state = state.copyWith(trip: cancelledTrip, isLoading: false);
+      _syncTripNotification();
       _cleanup();
     } on ApiException catch (e) {
       state = state.copyWith(
@@ -203,6 +269,19 @@ class TripInProgressViewModelState extends Equatable {
       trip?.status == TripStatus.aceptado ||
       trip?.status == TripStatus.enCurso;
 
+  /// ETA en minutos según la fase: llegada del conductor al origen
+  /// (aceptado) o llegada al destino (en curso). Null si aún no hay dato.
+  int? get etaMin {
+    switch (trip?.status) {
+      case TripStatus.aceptado:
+        return driverPosition?.etaPickupMin;
+      case TripStatus.enCurso:
+        return driverPosition?.etaDestinationMin;
+      default:
+        return null;
+    }
+  }
+
   TripInProgressViewModelState copyWith({
     Trip? trip,
     bool? isLoading,
@@ -227,5 +306,6 @@ final tripInProgressViewModelProvider =
     ref.watch(tripRepositoryProvider),
     ref.watch(tripTrackingServiceProvider),
     ref.watch(socketServiceProvider),
+    ref.watch(tripNotificationServiceProvider),
   );
 });

@@ -1,5 +1,6 @@
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/navigation/app_navigator.dart';
 import 'core/widgets/page_transitions.dart';
@@ -14,13 +15,13 @@ import 'features/trip/trip-in-progress/presentation/screens/trip_in_progress_scr
 import 'features/trip/trip-searching/presentation/screens/trip_searching_screen.dart';
 import 'routes/app_routes.dart';
 import 'theme/jala_theme.dart';
+import 'theme/theme_mode_provider.dart';
 
-class JalaApp extends StatelessWidget {
+class JalaApp extends ConsumerWidget {
   const JalaApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final brightness = View.of(context).platformDispatcher.platformBrightness;
+  Widget build(BuildContext context, WidgetRef ref) {
     final textTheme =
         createTextTheme(context, 'Plus Jakarta Sans', 'Plus Jakarta Sans');
     final theme = MaterialTheme(textTheme);
@@ -33,8 +34,9 @@ class JalaApp extends StatelessWidget {
       builder: DevicePreview.appBuilder,
       theme: theme.light(),
       darkTheme: theme.dark(),
-      themeMode:
-          brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+      // Claro/oscuro elegido por el usuario; en "sistema" sigue en vivo
+      // los cambios del SO (el themeMode fijo anterior no lo hacía).
+      themeMode: ref.watch(themeModeProvider),
       initialRoute: AppRoutes.splash,
       onGenerateRoute: (settings) {
         switch (settings.name) {

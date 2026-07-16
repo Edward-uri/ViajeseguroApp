@@ -4,81 +4,30 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
 import '../../theme/jala_theme.dart';
 
-/// Pin minimalista para seleccionar ubicación en el mapa.
-/// Círculo con borde + punto central, con sombra suave.
+/// Pin para seleccionar ubicación en el mapa (mismos PNG de map-icons que
+/// los pines dibujados sobre el mapa).
 class JalaPinMarker extends StatelessWidget {
   const JalaPinMarker({
     super.key,
-    this.color = JalaBrand.amber,
-    this.size = 40,
+    this.asset = 'lib/shared/icons/map-icons/Pin-Naranja.png',
+    this.width = 30,
+    this.height = 36,
   });
 
-  final Color color;
-  final double size;
+  final String asset;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 24),
-        child: CustomPaint(
-          size: Size(size, size),
-          painter: _MapPinPainter(color: color),
-        ),
+        // Deja la punta del pin en el centro exacto del mapa.
+        padding: EdgeInsets.only(bottom: height),
+        child: Image.asset(asset, width: width, height: height),
       ),
     );
   }
-}
-
-class _MapPinPainter extends CustomPainter {
-  _MapPinPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-
-    // Sombra suave
-    canvas.drawShadow(
-      Path()..addOval(Rect.fromCircle(center: center, radius: radius)),
-      Colors.black.withValues(alpha: 0.2),
-      6.0,
-      false,
-    );
-
-    // Círculo exterior blanco
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = Colors.white
-        ..style = PaintingStyle.fill,
-    );
-
-    // Borde de color
-    canvas.drawCircle(
-      center,
-      radius - 2,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
-
-    // Punto central de color
-    canvas.drawCircle(
-      center,
-      radius * 0.35,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.fill,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class JalaLocationMarker extends StatelessWidget {
@@ -130,7 +79,7 @@ class JalaMapView extends StatefulWidget {
     this.initialZoom = 2.0,
     this.showLocationMarker = false,
     this.showPinMarker = false,
-    this.pinMarkerColor = JalaBrand.amber,
+    this.pinMarkerAsset = 'lib/shared/icons/map-icons/Pin-Naranja.png',
     this.showCurrentLocationPin = true,
     this.onMapIdle,
     this.onCameraChanged,
@@ -144,7 +93,7 @@ class JalaMapView extends StatefulWidget {
   final double initialZoom;
   final bool showLocationMarker;
   final bool showPinMarker;
-  final Color pinMarkerColor;
+  final String pinMarkerAsset;
   final bool showCurrentLocationPin;
   final void Function(CameraChangedEventData)? onCameraChanged;
   final void Function(MapIdleEventData)? onMapIdle;
@@ -344,7 +293,7 @@ class _JalaMapViewState extends State<JalaMapView>
         if (widget.showPinMarker)
           Positioned.fill(
             child: IgnorePointer(
-              child: JalaPinMarker(color: widget.pinMarkerColor),
+              child: JalaPinMarker(asset: widget.pinMarkerAsset),
             ),
           ),
       ],

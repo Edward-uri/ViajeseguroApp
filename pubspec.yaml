@@ -71,6 +71,7 @@ dependencies:
   # Render de SVG a bytes para pines personalizados en Mapbox.
   vector_graphics: ^1.1.18+1
   url_launcher: ^6.3.2
+  flutter_local_notifications: ^22.0.1
 
 dev_dependencies:
   flutter_test:
@@ -101,6 +102,7 @@ flutter:
     - assets/
     - assets/mipmap-xxhdpi/
     - lib/shared/icons/
+    - lib/shared/icons/map-icons/
     - .env
 
   # To add assets to your application, add an assets section, like this:
@@ -135,9 +137,12 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
 # Configuración de íconos de launcher
+# Generados desde lib/shared/icons/Mototaxi-Icon.svg sobre el crema de la app
+# (JalaBrand.cream #FBF7F2). Fuentes en assets/icon/.
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/mipmap-xxhdpi/logo_mototaxi_linea_small.png"
-  adaptive_icon_background: "#F6F6F6"
-  adaptive_icon_foreground: "assets/mipmap-xxhdpi/logo_mototaxi_linea_small.png"
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#FBF7F2"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  remove_alpha_ios: true

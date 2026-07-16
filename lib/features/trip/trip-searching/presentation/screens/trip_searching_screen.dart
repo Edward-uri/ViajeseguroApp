@@ -101,8 +101,18 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
       debugPrint('[TripSearching] PinMarkerManager no disponible: $e');
     }
 
-    // Cargar pines SVG como imágenes de estilo del mapa
+    // El mapa puede recrearse (p.ej. cambio de tema claro/oscuro): el estilo
+    // nuevo no tiene las imágenes anteriores.
+    _pinImagesLoaded = false;
+
+    // Cargar pines PNG como imágenes de estilo del mapa
     await _loadPinImages();
+
+    // Si ya había ruta confirmada, redibujarla en el mapa nuevo.
+    final vm = ref.read(tripSearchingViewModelProvider);
+    if (vm.hasRoute && vm.origin != null && vm.destination != null) {
+      _drawRoute(vm.origin!, vm.destination!);
+    }
 
     if (_currentPosition != null) {
       _flyTo(_currentPosition!.latitude, _currentPosition!.longitude);
@@ -297,15 +307,15 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
               );
               final isPickingOnMap = vm.$1;
               final activeInput = vm.$2;
-              final pinColor = activeInput == LocationInputMode.origin
-                  ? context.brand.accentBlue
-                  : JalaBrand.amber;
+              final pinAsset = activeInput == LocationInputMode.origin
+                  ? 'lib/shared/icons/map-icons/Pin-Verde.png'
+                  : 'lib/shared/icons/map-icons/Pin-Naranja.png';
               return JalaMapView(
                 onMapCreated: _onMapCreated,
                 showLocationMarker: false,
                 showCurrentLocationPin: true,
                 showPinMarker: isPickingOnMap,
-                pinMarkerColor: pinColor,
+                pinMarkerAsset: pinAsset,
                 onCameraChanged: _onCameraChanged,
                 onMapIdle: _onMapIdle,
               );

@@ -7,6 +7,9 @@ import '../../../../theme/jala_theme.dart';
 import '../../../routes/app_routes.dart';
 import '../../auth/di/auth_module.dart';
 
+/// Splash de marca: siempre crema (igual que el launch screen nativo), así el
+/// arranque es un solo flujo de color sin flashazos, en claro y oscuro.
+/// El logo entra con escala + fade escalonados y el loader aparece después.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -15,31 +18,41 @@ class SplashScreen extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenState extends ConsumerState<SplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+    with SingleTickerProviderStateMixin {
+  static const _minSplash = Duration(milliseconds: 950);
+
+  late final AnimationController _controller = AnimationController(
+    duration: const Duration(milliseconds: 950),
+    vsync: this,
+  );
+
+  late final Animation<double> _logoFade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+  );
+
+  late final Animation<double> _logoScale = Tween<double>(begin: 0.82, end: 1.0)
+      .animate(CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.0, 0.65, curve: Curves.easeOutBack),
+  ));
+
+  late final Animation<Offset> _logoSlide = Tween<Offset>(
+    begin: const Offset(0, 0.06),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.0, 0.6, curve: Curves.easeOutCubic),
+  ));
+
+  late final Animation<double> _loaderFade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.55, 1.0, curve: Curves.easeOut),
+  );
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutCubic,
-    ));
-
     _controller.forward();
     WidgetsBinding.instance.addPostFrameCallback((_) => _decideRoute());
   }
@@ -47,11 +60,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Future<void> _decideRoute() async {
     final authRepo = ref.read(authRepositoryProvider);
     // Verificar sesión + delay mínimo en paralelo.
-    // El delay es solo para que la animación del logo termine.
+    // El delay deja terminar la animación del logo antes de navegar.
     final results = await Future.wait<dynamic>([
       authRepo.hasSession(),
       authRepo.getCurrentUser(),
-      Future<void>.delayed(const Duration(milliseconds: 400)),
+      Future<void>.delayed(_minSplash),
     ]);
     final hasSession = results[0] as bool;
     final user = results[1];
@@ -72,27 +85,37 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Tamaño relativo al dispositivo (con límites) en vez de píxeles fijos:
+    // se ve proporcionado igual en un teléfono chico que en una tablet.
+    final size = MediaQuery.sizeOf(context);
+    final logoWidth = (size.width * 0.62).clamp(220.0, 400.0);
+
     return Scaffold(
-      backgroundColor: context.colors.surface,
+      backgroundColor: JalaBrand.cream,
       body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'lib/shared/icons/logo_mototaxi_linea.png',
-                  width: 320,
-                  height: 240,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            FadeTransition(
+              opacity: _logoFade,
+              child: SlideTransition(
+                position: _logoSlide,
+                child: ScaleTransition(
+                  scale: _logoScale,
+                  child: Image.asset(
+                    'lib/shared/icons/logo_mototaxi_linea.png',
+                    width: logoWidth,
+                  ),
                 ),
-                const SizedBox(height: 40),
-                const BubbleLoader(size: 20),
-                const SizedBox(height: 60),
-              ],
+              ),
             ),
-          ),
+            SizedBox(height: size.height * 0.05),
+            FadeTransition(
+              opacity: _loaderFade,
+              child: const BubbleLoader(size: 20),
+            ),
+            SizedBox(height: size.height * 0.08),
+          ],
         ),
       ),
     );

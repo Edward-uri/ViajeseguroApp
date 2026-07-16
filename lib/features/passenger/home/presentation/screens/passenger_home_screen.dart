@@ -8,6 +8,7 @@ import '../../../../../core/di/core_module.dart';
 import '../../../../../routes/app_routes.dart';
 import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/jala_theme.dart';
+import '../../../../../theme/theme_mode_provider.dart';
 import '../../../../auth/di/auth_module.dart';
 import '../../../../trip/trip-in-progress/domain/entities/trip.dart';
 import '../../../../trip/trip-in-progress/presentation/provider/trip_in_progress_viewmodel.dart';
@@ -336,16 +337,6 @@ class _ProfileTabContent extends ConsumerWidget {
                       onTap: () =>
                           Navigator.of(context).pushNamed(AppRoutes.profile),
                     ),
-                    JalaSidebarOption(
-                      icon: Icons.account_balance_wallet_outlined,
-                      label: 'Metodos de pago',
-                      onTap: () {},
-                    ),
-                    JalaSidebarOption(
-                      icon: Icons.location_on_outlined,
-                      label: 'Mis direcciones',
-                      onTap: () {},
-                    ),
                   ],
                 ),
                 JalaSidebarSection(
@@ -355,6 +346,12 @@ class _ProfileTabContent extends ConsumerWidget {
                       icon: Icons.notifications_outlined,
                       label: 'Notificaciones',
                       onTap: () {},
+                    ),
+                    JalaSidebarOption(
+                      icon: Icons.dark_mode_outlined,
+                      label:
+                          'Tema: ${_themeModeLabel(ref.watch(themeModeProvider))}',
+                      onTap: () => _pickThemeMode(context, ref),
                     ),
                   ],
                 ),
@@ -381,5 +378,48 @@ class _ProfileTabContent extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _themeModeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Claro';
+      case ThemeMode.dark:
+        return 'Oscuro';
+      case ThemeMode.system:
+        return 'Sistema';
+    }
+  }
+
+  Future<void> _pickThemeMode(BuildContext context, WidgetRef ref) async {
+    final current = ref.read(themeModeProvider);
+    final selected = await showModalBottomSheet<ThemeMode>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in const [
+              (ThemeMode.light, Icons.light_mode_outlined, 'Claro'),
+              (ThemeMode.dark, Icons.dark_mode_outlined, 'Oscuro'),
+              (ThemeMode.system, Icons.brightness_auto_outlined, 'Sistema'),
+            ])
+              ListTile(
+                leading: Icon(entry.$2),
+                title: Text(entry.$3),
+                trailing: entry.$1 == current
+                    ? Icon(Icons.check_rounded, color: context.brand.success)
+                    : null,
+                onTap: () => Navigator.of(ctx).pop(entry.$1),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (selected != null) {
+      ref.read(themeModeProvider.notifier).setMode(selected);
+    }
   }
 }

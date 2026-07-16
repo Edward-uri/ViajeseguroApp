@@ -34,6 +34,8 @@ class SocketTripTrackingService implements TripTrackingService {
         latitude: event.lat!,
         longitude: event.lng!,
         timestamp: DateTime.now(),
+        etaPickupMin: event.etaRecogidaMin,
+        etaDestinationMin: event.etaDestinoMin,
       ));
     });
 

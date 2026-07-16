@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/di/core_module.dart';
+import '../../../../core/notifications/trip_notification_service.dart';
 import '../data/remote/trip_api.dart';
 import '../data/socket_trip_tracking_service.dart';
 import '../data/trip_repository_impl.dart';
@@ -17,4 +18,8 @@ final tripRepositoryProvider = Provider<TripRepository>((ref) {
 
 final tripTrackingServiceProvider = Provider<TripTrackingService>((ref) {
   return SocketTripTrackingService(ref.watch(socketServiceProvider));
+});
+
+final tripNotificationServiceProvider = Provider<TripNotificationService>((ref) {
+  return TripNotificationService();
 });

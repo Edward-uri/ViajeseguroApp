@@ -15,6 +15,8 @@ class DriverPosition {
     this.heading,
     this.speed,
     this.timestamp,
+    this.etaPickupMin,
+    this.etaDestinationMin,
   });
 
   final double latitude;
@@ -22,4 +24,11 @@ class DriverPosition {
   final double? heading;
   final double? speed;
   final DateTime? timestamp;
+
+  /// Minutos para que el conductor llegue al origen (viaje aceptado).
+  final int? etaPickupMin;
+
+  /// Minutos para llegar al destino (recogida + trayecto en aceptado;
+  /// solo trayecto restante en curso).
+  final int? etaDestinationMin;
 }

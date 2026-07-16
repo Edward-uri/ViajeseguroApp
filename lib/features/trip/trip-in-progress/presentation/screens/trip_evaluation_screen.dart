@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../routes/app_routes.dart';
-import '../../../../../theme/theme.dart';
+import '../../../../../shared/widgets/fade_slide_in.dart';
+import '../../../../../theme/jala_theme.dart';
 import '../../di/trip_in_progress_module.dart';
 import '../../domain/entities/trip.dart';
 
 /// Pantalla para que el pasajero califique al conductor al terminar el viaje.
+/// Entrada escalonada (fade+slide) con badge de éxito animado y estrellas
+/// con "pop" al seleccionar.
 class TripEvaluationScreen extends ConsumerStatefulWidget {
   const TripEvaluationScreen({super.key, required this.trip});
 
@@ -78,49 +81,99 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 48),
-                Icon(Icons.check_circle_rounded, color: JalaBrand.success, size: 64),
-                const SizedBox(height: 16),
-                Text(
-                  'Viaje completado',
-                  textAlign: TextAlign.center,
-                  style: text.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '¿Cómo estuvo tu viaje con $nombre?',
-                  textAlign: TextAlign.center,
-                  style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                // Badge de éxito: crece con rebote suave sobre fondo tenue.
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 80),
+                  child: Center(
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.4, end: 1.0),
+                      duration: const Duration(milliseconds: 650),
+                      curve: Curves.easeOutBack,
+                      builder: (context, scale, child) =>
+                          Transform.scale(scale: scale, child: child),
+                      child: Container(
+                        width: 96,
+                        height: 96,
+                        decoration: BoxDecoration(
+                          color: context.brand.successLight,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.check_rounded,
+                          color: context.brand.success,
+                          size: 52,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (i) {
-                    final value = i + 1;
-                    return IconButton(
-                      onPressed: _enviando
-                          ? null
-                          : () => setState(() {
-                                _rating = value;
-                                _error = null;
-                              }),
-                      iconSize: 40,
-                      icon: Icon(
-                        value <= _rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                        color: JalaBrand.amber,
-                      ),
-                    );
-                  }),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 180),
+                  child: Text(
+                    'Viaje completado',
+                    textAlign: TextAlign.center,
+                    style: text.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 260),
+                  child: Text(
+                    '¿Cómo estuvo tu viaje con $nombre?',
+                    textAlign: TextAlign.center,
+                    style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 340),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(5, (i) {
+                      final value = i + 1;
+                      final filled = value <= _rating;
+                      return IconButton(
+                        onPressed: _enviando
+                            ? null
+                            : () => setState(() {
+                                  _rating = value;
+                                  _error = null;
+                                }),
+                        iconSize: 40,
+                        icon: AnimatedScale(
+                          scale: filled ? 1.12 : 0.92,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutBack,
+                          child: Icon(
+                            filled
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: filled
+                                ? JalaBrand.amber
+                                : context.brand.greyBorder,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _comentario,
-                  enabled: !_enviando,
-                  maxLines: 3,
-                  maxLength: 160,
-                  decoration: InputDecoration(
-                    hintText: 'Deja un comentario (opcional)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 420),
+                  child: TextField(
+                    controller: _comentario,
+                    enabled: !_enviando,
+                    maxLines: 3,
+                    maxLength: 160,
+                    decoration: InputDecoration(
+                      hintText: 'Deja un comentario (opcional)',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                   ),
                 ),
@@ -129,27 +182,39 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
                   Text(_error!, style: TextStyle(color: scheme.error, fontSize: 13)),
                 ],
                 const SizedBox(height: 24),
-                SizedBox(
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _enviando ? null : _enviar,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: JalaBrand.amber,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 500),
+                  child: SizedBox(
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: _enviando ? null : _enviar,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: JalaBrand.amber,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                    ),
-                    child: Text(
-                      _enviando ? 'Enviando…' : 'Enviar calificación',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: Text(
+                          _enviando ? 'Enviando…' : 'Enviar calificación',
+                          key: ValueKey(_enviando),
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _enviando ? null : _irAlHome,
-                  child: const Text('Omitir'),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 560),
+                  child: TextButton(
+                    onPressed: _enviando ? null : _irAlHome,
+                    child: const Text('Omitir'),
+                  ),
                 ),
               ],
             ),

@@ -20,6 +20,11 @@ class TripSocketEvent {
 
   double? get lat => (data['lat'] as num?)?.toDouble();
   double? get lng => (data['lng'] as num?)?.toDouble();
+
+  /// ETA en minutos que calcula el backend con cada `viaje:ubicacion_conductor`
+  /// (null si OSRM no respondió en ese tick).
+  int? get etaRecogidaMin => (data['etaRecogidaMin'] as num?)?.round();
+  int? get etaDestinoMin => (data['etaDestinoMin'] as num?)?.round();
 }
 
 /// Servicio global de WebSocket (Socket.IO) para la app del pasajero.

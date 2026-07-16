@@ -4,6 +4,13 @@ class UserMapper {
   const UserMapper._();
 
   static User fromJson(Map<String, dynamic> json) {
+    // GET/PUT /api/users/me anidan los datos personales (nombre, apellidos,
+    // idSexo, fechaNacimiento) en el bloque `persona`: aplanarlo para que
+    // lleguen a la entidad. Las claves de nivel raíz tienen prioridad.
+    final persona = json['persona'];
+    if (persona is Map<String, dynamic>) {
+      json = {...persona, ...json};
+    }
     return User(
       idUsuario: _parseInt(json['idUsuario'] ?? json['id'] ?? 0),
       telefono: (json['telefono'] ?? json['phone'] ?? '').toString(),

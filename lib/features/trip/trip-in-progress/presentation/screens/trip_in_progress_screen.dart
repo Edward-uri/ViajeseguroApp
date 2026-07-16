@@ -31,10 +31,14 @@ class TripInProgressScreen extends ConsumerStatefulWidget {
 class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   MapboxMap? _mapboxMap;
   PolylineAnnotationManager? _polylineManager;
-  CircleAnnotationManager? _driverCircleManager;
-  CircleAnnotation? _driverCircle;
+  PointAnnotationManager? _driverMarkerManager;
+  PointAnnotation? _driverMarker;
   PointAnnotationManager? _pinMarkerManager;
-  bool _routeDrawn = false;
+  PolylineAnnotation? _routeLine;
+  List<Position> _routeCoords = [];
+  int _routeIndex = 0;
+  _RouteKind? _routeKind;
+  bool _fetchingRoute = false;
   bool _pinImagesLoaded = false;
 
   @override
@@ -56,10 +60,10 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
       debugPrint('[TripInProgress] PolylineAnnotation no disponible: $e');
     }
     try {
-      _driverCircleManager =
-          await mapboxMap.annotations.createCircleAnnotationManager();
+      _driverMarkerManager =
+          await mapboxMap.annotations.createPointAnnotationManager();
     } catch (e) {
-      debugPrint('[TripInProgress] CircleAnnotation no disponible: $e');
+      debugPrint('[TripInProgress] DriverMarkerManager no disponible: $e');
     }
     try {
       _pinMarkerManager =
@@ -68,10 +72,19 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
       debugPrint('[TripInProgress] PinMarkerManager no disponible: $e');
     }
 
-    // Cargar pines SVG como imágenes de estilo del mapa
+    // El mapa puede recrearse (p.ej. cambio de tema claro/oscuro): el estilo
+    // nuevo no tiene las imágenes ni las anotaciones anteriores.
+    _pinImagesLoaded = false;
+    _routeLine = null;
+    _routeKind = null;
+    _routeIndex = 0;
+    _driverMarker = null;
+
+    // Cargar pines PNG como imágenes de estilo del mapa
     await _loadPinImages();
 
-    _drawRoute();
+    _drawOriginDestinationPins();
+    _syncRoute();
     _fitRoute();
 
     // Si ya recibimos una posición del conductor antes de que el mapa estuviera
@@ -110,23 +123,54 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     }
   }
 
-  void _drawRoute() async {
-    if (_routeDrawn) return;
-    final trip = widget.trip;
+  /// Dibuja/actualiza la línea de ruta según la fase del viaje:
+  /// aceptado → conductor→origen (se acorta al acercarse a recoger);
+  /// en curso → origen→destino (se acorta al acercarse al destino);
+  /// sin posición del conductor → ruta completa origen→destino.
+  void _syncRoute() async {
+    final manager = _polylineManager;
+    if (manager == null) return;
+
+    final vmState = ref.read(tripInProgressViewModelProvider);
+    final trip = vmState.trip ?? widget.trip;
+    final pos = vmState.driverPosition;
+    final toOrigin = trip.status == TripStatus.aceptado && pos != null;
+    final kind = toOrigin ? _RouteKind.toOrigin : _RouteKind.trip;
+
+    // La ruta de esta fase ya está dibujada: solo recortarla.
+    if (kind == _routeKind && _routeLine != null) {
+      if (pos != null && vmState.isActive) _trimRoute(pos);
+      return;
+    }
+    if (_fetchingRoute) return;
+    _fetchingRoute = true;
+
+    final double fromLat, fromLng, toLat, toLng;
+    if (toOrigin) {
+      fromLat = pos.latitude;
+      fromLng = pos.longitude;
+      toLat = trip.origin.latitude;
+      toLng = trip.origin.longitude;
+    } else {
+      fromLat = trip.origin.latitude;
+      fromLng = trip.origin.longitude;
+      toLat = trip.destination.latitude;
+      toLng = trip.destination.longitude;
+    }
 
     // Respaldo (línea recta) si OSRM no responde: la ruta y los pines SIEMPRE
     // deben verse mientras haya un viaje activo.
     var coordinates = <Position>[
-      Position(trip.origin.longitude, trip.origin.latitude),
-      Position(trip.destination.longitude, trip.destination.latitude),
+      Position(fromLng, fromLat),
+      Position(toLng, toLat),
     ];
     try {
       final repo = ref.read(tripSearchRepositoryProvider);
       final routeCoords = await repo.getRoute(
-        originLat: trip.origin.latitude,
-        originLng: trip.origin.longitude,
-        destinationLat: trip.destination.latitude,
-        destinationLng: trip.destination.longitude,
+        originLat: fromLat,
+        originLng: fromLng,
+        destinationLat: toLat,
+        destinationLng: toLng,
       );
       if (routeCoords.isNotEmpty) {
         coordinates = routeCoords.map((c) => Position(c[0], c[1])).toList();
@@ -136,19 +180,54 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     }
 
     try {
-      _polylineManager?.create(PolylineAnnotationOptions(
+      await manager.deleteAll();
+      _routeLine = await manager.create(PolylineAnnotationOptions(
         geometry: LineString(coordinates: coordinates),
         lineColor: JalaBrand.amber.toARGB32(),
         lineWidth: 5.0,
         lineOpacity: 0.9,
       ));
-      _routeDrawn = true;
+      _routeCoords = coordinates;
+      _routeIndex = 0;
+      _routeKind = kind;
     } catch (e) {
       debugPrint('[TripInProgress] No se pudo dibujar la ruta: $e');
+    } finally {
+      _fetchingRoute = false;
     }
+  }
 
-    // Los pines de origen/destino se dibujan siempre, haya o no ruta de OSRM.
-    _drawOriginDestinationPins();
+  /// Recorta la línea al tramo que falta por recorrer (estilo Uber/DiDi).
+  /// ponytail: recorte por vértice más cercano con avance monotónico; si la
+  /// ruta se cruza consigo misma podría saltar tramo — proyección por
+  /// segmento si algún día hace falta. Si el conductor se desvía, la línea
+  /// no se recalcula (sin re-ruteo).
+  void _trimRoute(DriverPosition pos) async {
+    final line = _routeLine;
+    if (line == null || _routeCoords.length < 2) return;
+
+    var best = _routeIndex;
+    var bestD = double.infinity;
+    for (var i = _routeIndex; i < _routeCoords.length; i++) {
+      final dLat = _routeCoords[i].lat - pos.latitude;
+      final dLng = _routeCoords[i].lng - pos.longitude;
+      final d = dLat * dLat + dLng * dLng;
+      if (d < bestD) {
+        bestD = d.toDouble();
+        best = i;
+      }
+    }
+    _routeIndex = best;
+
+    try {
+      line.geometry = LineString(coordinates: [
+        Position(pos.longitude, pos.latitude),
+        ..._routeCoords.sublist(best),
+      ]);
+      await _polylineManager?.update(line);
+    } catch (e) {
+      debugPrint('[TripInProgress] Error recortando ruta: $e');
+    }
   }
 
   void _drawOriginDestinationPins() {
@@ -211,8 +290,9 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   }
 
   void _updateDriverMarker(DriverPosition pos) async {
-    final manager = _driverCircleManager;
-    if (manager == null) return;
+    final manager = _driverMarkerManager;
+    // Si el icono aún no está cargado, el siguiente tick de posición lo dibuja.
+    if (manager == null || !_pinImagesLoaded) return;
 
     // Solo mostrar el marcador si el viaje está aceptado o en curso.
     final status = ref.read(tripInProgressViewModelProvider).trip?.status;
@@ -220,19 +300,17 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
 
     final point = Point(coordinates: Position(pos.longitude, pos.latitude));
     try {
-      if (_driverCircle == null) {
-        // Punto de "ubicación en vivo" del conductor (círculo, sin depender de SVG).
-        _driverCircle = await manager.create(CircleAnnotationOptions(
+      if (_driverMarker == null) {
+        // Mototaxi del conductor (mismo icono de map-icons que el resto de pines).
+        _driverMarker = await manager.create(PointAnnotationOptions(
           geometry: point,
-          circleRadius: 9.0,
-          circleColor: JalaBrand.amber.toARGB32(),
-          circleStrokeWidth: 3.0,
-          circleStrokeColor: 0xFFFFFFFF,
+          iconImage: 'mototaxi-mapa',
+          iconSize: 1.0,
         ));
       } else {
-        // Mover el círculo existente (no recrear: evita parpadeo).
-        _driverCircle!.geometry = point;
-        await manager.update(_driverCircle!);
+        // Mover el marcador existente (no recrear: evita parpadeo).
+        _driverMarker!.geometry = point;
+        await manager.update(_driverMarker!);
       }
     } catch (e) {
       debugPrint('[TripInProgress] Error actualizando marcador del conductor: $e');
@@ -247,10 +325,16 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     ref.listen<TripInProgressViewModelState>(
       tripInProgressViewModelProvider,
       (previous, next) {
-        // Actualizar marcador del conductor en tiempo real
+        // Actualizar marcador del conductor y recortar la ruta en tiempo real
         if (next.driverPosition != null &&
             next.driverPosition != previous?.driverPosition) {
           _updateDriverMarker(next.driverPosition!);
+          _syncRoute();
+        }
+
+        // Cambio de fase (p.ej. aceptado → en curso): redibujar la ruta.
+        if (next.trip?.status != previous?.trip?.status) {
+          _syncRoute();
         }
 
         // Al completar: pasar a calificar al conductor. Al cancelar: ir al home.
@@ -327,8 +411,14 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
                 final isLoading = ref.watch(
                   tripInProgressViewModelProvider.select((s) => s.isLoading),
                 );
+                // ETA del backend: solo rebuild cuando cambia el minuto,
+                // no en cada tick de posición.
+                final etaMin = ref.watch(
+                  tripInProgressViewModelProvider.select((s) => s.etaMin),
+                );
                 return _TripBottomPanel(
                   trip: trip,
+                  etaMin: etaMin,
                   isLoading: isLoading,
                   bottomPad: bottomPad,
                   onCancel: () => _showCancelDialog(context),
@@ -381,6 +471,7 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
 class _TripBottomPanel extends StatefulWidget {
   const _TripBottomPanel({
     required this.trip,
+    required this.etaMin,
     required this.isLoading,
     required this.bottomPad,
     required this.onCancel,
@@ -389,6 +480,7 @@ class _TripBottomPanel extends StatefulWidget {
   });
 
   final Trip trip;
+  final int? etaMin;
   final bool isLoading;
   final double bottomPad;
   final VoidCallback onCancel;
@@ -516,9 +608,15 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
         }
         return 'Esperando conductor';
       case TripStatus.aceptado:
-        return 'Tu mototaxi esta en camino';
+        final eta = widget.etaMin;
+        return eta != null
+            ? 'Llega en ~$eta min'
+            : 'Tu mototaxi esta en camino';
       case TripStatus.enCurso:
-        return 'Dirigete a tu destino';
+        final eta = widget.etaMin;
+        return eta != null
+            ? 'Llegas a tu destino en ~$eta min'
+            : 'Dirigete a tu destino';
       case TripStatus.completado:
         return 'Gracias por usar Jala';
       case TripStatus.cancelado:
@@ -1278,4 +1376,13 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
       ),
     );
   }
+}
+
+/// Qué tramo representa la línea dibujada en el mapa.
+enum _RouteKind {
+  /// Conductor → origen (viaje aceptado, va a recoger al pasajero).
+  toOrigin,
+
+  /// Origen → destino (viaje en curso o aún sin posición del conductor).
+  trip,
 }
