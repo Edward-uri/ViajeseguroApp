@@ -13,6 +13,7 @@ import 'core/env/api_config.dart';
 import 'core/messaging/background_message_handler.dart';
 import 'core/messaging/firebase_push_messaging_service.dart';
 import 'core/navigation/app_navigator.dart';
+import 'core/notifications/local_notification_service.dart';
 import 'core/security/remote_wipe_handler.dart';
 import 'core/storage/secure_auth_storage.dart';
 import 'core/storage/secure_sensitive_data_storage.dart';
@@ -54,6 +55,13 @@ Future<void> main() async {
     debugPrint('[App] Servicios de seguridad inicializados');
   } catch (e) {
     debugPrint('[App] Error en servicios de seguridad: $e');
+  }
+
+  try {
+    await LocalNotificationService.instance.initialize();
+    debugPrint('[App] Local notifications inicializado');
+  } catch (e) {
+    debugPrint('[App] Error inicializando local notifications: $e');
   }
 
   if (kDebugMode) {

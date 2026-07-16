@@ -161,6 +161,51 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
     );
   }
 
+  Future<void> useCurrentLocation(double latitude, double longitude) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final location = await _tripSearchRepository.reverseGeocode(latitude, longitude);
+      final resolved = location.copyWith(latitude: latitude, longitude: longitude);
+
+      if (state.activeInput == LocationInputMode.origin) {
+        state = state.copyWith(
+          origin: resolved,
+          activeInput: LocationInputMode.destination,
+          step: TripSearchingStep.selectingDestination,
+          isLoading: false,
+        );
+      } else {
+        state = state.copyWith(
+          destination: resolved,
+          step: TripSearchingStep.readyToConfirm,
+          isLoading: false,
+        );
+      }
+    } catch (e) {
+      // Fallback: usar coordenadas sin reverse geocode
+      final fallback = TripLocation(
+        address: 'Ubicacion actual',
+        latitude: latitude,
+        longitude: longitude,
+        placeName: 'Ubicacion actual',
+      );
+      if (state.activeInput == LocationInputMode.origin) {
+        state = state.copyWith(
+          origin: fallback,
+          activeInput: LocationInputMode.destination,
+          step: TripSearchingStep.selectingDestination,
+          isLoading: false,
+        );
+      } else {
+        state = state.copyWith(
+          destination: fallback,
+          step: TripSearchingStep.readyToConfirm,
+          isLoading: false,
+        );
+      }
+    }
+  }
+
   void setSearchQuery(String query) {
     state = state.copyWith(searchQuery: query);
     searchAddress(query);

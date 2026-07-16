@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/di/core_module.dart';
 import '../../../../../core/http/api_exception.dart';
+import '../../../../../core/notifications/local_notification_service.dart';
 import '../../../../../core/websocket/socket_service.dart';
 import '../../../trip-searching/domain/entities/trip_location.dart';
 import '../../../trip-searching/domain/entities/trip_fare.dart';
@@ -52,6 +53,11 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
       if (event.idViaje != tripIdInt) return;
       // Refrescar para obtener driverName, driverPhone, vehicleInfo, etc.
       await _refreshTrip(tripId);
+      // Notificación: conductor en camino
+      LocalNotificationService.instance.showTripNotification(
+        TripNotificationType.conductorEnCamino,
+        tripId: tripId,
+      );
     });
 
     // viaje:cambio_estado → { idViaje, estado }
@@ -90,7 +96,19 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
         driverPosition: state.driverPosition,
       );
 
+      // Notificaciones según el nuevo estado
+      if (parsed == TripStatus.enCurso) {
+        LocalNotificationService.instance.showTripNotification(
+          TripNotificationType.viajeEnCurso,
+          tripId: tripId,
+        );
+      }
+
       if (parsed == TripStatus.completado) {
+        LocalNotificationService.instance.showTripNotification(
+          TripNotificationType.viajeTerminado,
+          tripId: tripId,
+        );
         _cleanup();
       }
     });

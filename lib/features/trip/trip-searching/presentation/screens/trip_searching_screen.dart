@@ -65,6 +65,14 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
       }
       if (permission == geo.LocationPermission.deniedForever) return;
 
+      // Usar ultima posicion conocida primero para carga rapida
+      final lastKnown = await geo.Geolocator.getLastKnownPosition();
+      if (lastKnown != null && mounted) {
+        setState(() => _currentPosition = lastKnown);
+        _flyTo(lastKnown.latitude, lastKnown.longitude);
+      }
+
+      // Luego obtener posicion precisa en background
       final position = await geo.Geolocator.getCurrentPosition(
         desiredAccuracy: geo.LocationAccuracy.high,
       );
@@ -90,18 +98,8 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
 
   void _onMapCreated(MapboxMap mapboxMap) async {
     _mapboxMap = mapboxMap;
-    try {
-      _polylineManager = await mapboxMap.annotations.createPolylineAnnotationManager();
-    } catch (e) {
-      debugPrint('[TripSearching] PolylineAnnotation no disponible: $e');
-    }
-    try {
-      _pinMarkerManager = await mapboxMap.annotations.createPointAnnotationManager();
-    } catch (e) {
-      debugPrint('[TripSearching] PinMarkerManager no disponible: $e');
-    }
 
-    // Cargar pines SVG como imágenes de estilo del mapa
+    // Cargar imagenes de pines una sola vez
     await _loadPinImages();
 
     if (_currentPosition != null) {
@@ -156,6 +154,8 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   }
 
   void _drawRoute(TripLocation origin, TripLocation destination) async {
+    // Crear managers bajo demanda
+    _polylineManager ??= await _mapboxMap?.annotations.createPolylineAnnotationManager();
     _polylineManager?.deleteAll();
 
     // Pines de origen y destino INMEDIATAMENTE — sin esperar la ruta.
@@ -204,10 +204,12 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
     );
   }
 
-  void _drawOriginDestinationPins(TripLocation origin, TripLocation destination) {
+  void _drawOriginDestinationPins(TripLocation origin, TripLocation destination) async {
+    // Crear manager bajo demanda
+    _pinMarkerManager ??= await _mapboxMap?.annotations.createPointAnnotationManager();
     if (_pinMarkerManager == null) {
       Future.delayed(const Duration(milliseconds: 500), () {
-        if (_pinMarkerManager != null && mounted) {
+        if (_mapboxMap != null && mounted) {
           _drawOriginDestinationPins(origin, destination);
         }
       });
@@ -362,18 +364,10 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
                   onRequestFare: () => _requestFare(notifier),
                   onUseCurrentLocation: () {
                     if (_currentPosition == null) return;
-                    final location = TripLocation(
-                      address: 'Mi ubicacion actual',
-                      latitude: _currentPosition!.latitude,
-                      longitude: _currentPosition!.longitude,
-                      placeName: 'Mi ubicacion',
+                    notifier.useCurrentLocation(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
                     );
-                    if (vm.activeInput == LocationInputMode.origin) {
-                      notifier.selectOrigin(location);
-                      _destinationFocusNode.requestFocus();
-                    } else {
-                      notifier.selectDestination(location);
-                    }
                   },
                 );
               },
