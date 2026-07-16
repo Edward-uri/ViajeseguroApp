@@ -116,7 +116,7 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
                   controller: _comentario,
                   enabled: !_enviando,
                   maxLines: 3,
-                  maxLength: 500,
+                  maxLength: 160,
                   decoration: InputDecoration(
                     hintText: 'Deja un comentario (opcional)',
                     border: OutlineInputBorder(

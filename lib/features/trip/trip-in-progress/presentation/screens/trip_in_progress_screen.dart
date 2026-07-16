@@ -892,6 +892,8 @@ class _DriverCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (idConductor != null)
+                  JalaReputationChips(idUsuario: idConductor!, rol: 'conductor'),
                 if (phone != null) ...[
                   const SizedBox(height: 4),
                   Row(

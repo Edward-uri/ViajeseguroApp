@@ -22,7 +22,7 @@ config/local.json
 # Environment secrets
 .env
 opencode.json
-
+/.superpowers
 # IntelliJ related
 *.iml
 *.ipr

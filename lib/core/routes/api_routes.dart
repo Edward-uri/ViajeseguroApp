@@ -20,6 +20,10 @@ abstract class ApiRoutes {
 
   static const String dispositivos = '/api/dispositivos';
 
+  /// Etiquetas de reputación (top-3 inferidas por LLM-JALA).
+  static String usuarioEtiquetas(int id, String rol) =>
+      '/api/usuarios/$id/etiquetas?rol=$rol';
+
   static const String usersBase = '/api/users';
   static const String usersMe = '$usersBase/me';
   static const String usersMePhoto = '$usersBase/me/photo';

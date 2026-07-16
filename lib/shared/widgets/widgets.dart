@@ -7,5 +7,6 @@ export 'jala_floating_circle_button.dart';
 export 'jala_home_bottom_sheet.dart';
 export 'jala_map_view.dart';
 export 'jala_menu_sheet.dart';
+export 'jala_reputation_chips.dart';
 export 'jala_sidebar.dart';
 export 'jala_top_bar.dart';
