@@ -110,16 +110,35 @@ class _JalaMapViewState extends State<JalaMapView>
   CircleAnnotationManager? _circleManager;
   geo.Position? _currentPosition;
   bool _located = false;
+  bool _isDark = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _isDark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
     if (widget.autoLocate &&
         widget.initialLatitude == null &&
         widget.initialLongitude == null) {
       _resolveCurrentLocation();
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant JalaMapView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateMapStyle();
+  }
+
+  void _updateMapStyle() {
+    final newIsDark = Theme.of(context).brightness == Brightness.dark;
+    if (newIsDark == _isDark) return;
+    _isDark = newIsDark;
+
+    final newStyle = widget.styleUri ??
+        (newIsDark ? MapboxStyles.DARK : MapboxStyles.STANDARD);
+
+    _mapboxMap?.style.setStyleURI(newStyle);
   }
 
   @override
@@ -268,7 +287,6 @@ class _JalaMapViewState extends State<JalaMapView>
       children: [
         Positioned.fill(
           child: MapWidget(
-            key: ValueKey("jalaMapWidget_${isDark ? 'dark' : 'light'}"),
             cameraOptions: CameraOptions(
               center: Point(
                 coordinates: Position(
