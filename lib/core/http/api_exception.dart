@@ -24,3 +24,7 @@ class ValidationException extends ApiException {
   ValidationException(super.message, {super.details})
       : super(statusCode: 400);
 }
+
+class SecurityException extends ApiException {
+  SecurityException(super.message) : super(statusCode: null);
+}
