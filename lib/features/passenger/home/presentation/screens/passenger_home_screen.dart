@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../core/auth/current_user_provider.dart';
 import '../../../../../core/di/core_module.dart';
@@ -345,7 +346,7 @@ class _ProfileTabContent extends ConsumerWidget {
                     JalaSidebarOption(
                       icon: Icons.notifications_outlined,
                       label: 'Notificaciones',
-                      onTap: () {},
+                      onTap: () => _openAppSettings(context),
                     ),
                     JalaSidebarOption(
                       icon: Icons.dark_mode_outlined,
@@ -365,8 +366,13 @@ class _ProfileTabContent extends ConsumerWidget {
                     ),
                     JalaSidebarOption(
                       icon: Icons.description_outlined,
-                      label: 'Terminos y privacidad',
-                      onTap: () {},
+                      label: 'Términos y Condiciones',
+                      onTap: () => _openUrl(context, 'https://terminos-y-condiciones-rosy.vercel.app/'),
+                    ),
+                    JalaSidebarOption(
+                      icon: Icons.privacy_tip_outlined,
+                      label: 'Políticas de Privacidad',
+                      onTap: () => _openUrl(context, 'https://politicas-de-privacidad-zeta.vercel.app/'),
                     ),
                   ],
                 ),
@@ -420,6 +426,36 @@ class _ProfileTabContent extends ConsumerWidget {
     );
     if (selected != null) {
       ref.read(themeModeProvider.notifier).setMode(selected);
+    }
+  }
+
+  Future<void> _openUrl(BuildContext context, String url) async {
+    try {
+      final uri = Uri.parse(url);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('[PassengerHome] No se pudo abrir $url: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir el enlace')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openAppSettings(BuildContext context) async {
+    try {
+      // En Android, abrir la configuración de la app directamente
+      const packageName = 'com.jala.pasajero';
+      final uri = Uri.parse('package:$packageName');
+      await launchUrl(uri);
+    } catch (e) {
+      debugPrint('[PassengerHome] No se pudo abrir la configuración: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo abrir la configuración')),
+        );
+      }
     }
   }
 }
