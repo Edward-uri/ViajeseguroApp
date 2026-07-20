@@ -1,6 +1,6 @@
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -29,7 +29,7 @@ Future<void> addSvgPinToMap(
 
     final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
     if (byteData == null) {
-      debugPrint('[SvgToMapbox] toByteData returned null for $imageId');
+      if (kDebugMode) debugPrint('[SvgToMapbox] toByteData returned null for $imageId');
       return;
     }
 
@@ -46,15 +46,25 @@ Future<void> addSvgPinToMap(
       null,
     );
   } catch (e) {
-    debugPrint('[SvgToMapbox] Error cargando $imageId: $e');
+    if (kDebugMode) debugPrint('[SvgToMapbox] Error cargando $imageId: $e');
   }
 }
 
+/// Factor de nitidez de los pines PNG: se registran a width*height lógicos
+/// por [_pinScale] píxeles reales y con ese mismo `scale` en addStyleImage,
+/// así Mapbox los dibuja al tamaño declarado pero nítidos en pantallas 2x-3x
+/// (en iOS es el scale de UIImage; en Android el pixelRatio del core).
+const int _pinScale = 2;
+
 /// Carga un PNG como imagen de estilo en el mapa Mapbox.
 ///
-/// Lee el PNG desde assets y lo registra con [imageId] en el estilo del mapa.
-/// Después se puede usar en `PointAnnotationOptions(iconImage: imageId)`.
-Future<void> addPngPinToMap(
+/// Lee el PNG desde assets, lo redimensiona a [width]x[height] lógicos y lo
+/// registra con [imageId] en el estilo del mapa. Después se puede usar en
+/// `PointAnnotationOptions(iconImage: imageId)`.
+///
+/// Devuelve `true` si la imagen quedó registrada; `false` si falló (en ese
+/// caso el caller NO debe marcar su flag de pines cargados).
+Future<bool> addPngPinToMap(
   MapboxMap map,
   String imageId,
   String pngAssetPath, {
@@ -65,16 +75,41 @@ Future<void> addPngPinToMap(
     final data = await rootBundle.load(pngAssetPath);
     final bytes = data.buffer.asUint8List();
 
+    // Decodificar y redimensionar ANTES de registrar: Android decodifica el
+    // PNG a su tamaño real pero construye la imagen nativa con el
+    // width/height declarados; si no coinciden, addStyleImage falla y el
+    // marcador queda invisible.
+    final codec = await ui.instantiateImageCodec(
+      bytes,
+      targetWidth: width * _pinScale,
+      targetHeight: height * _pinScale,
+    );
+    final frame = await codec.getNextFrame();
+    final resized =
+        await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+    if (resized == null) {
+      if (kDebugMode) debugPrint('[PngToMapbox] toByteData null para $imageId');
+      return false;
+    }
+
     await map.style.addStyleImage(
       imageId,
-      1.0,
-      MbxImage(width: width, height: height, data: bytes),
+      _pinScale.toDouble(),
+      MbxImage(
+        width: width * _pinScale,
+        height: height * _pinScale,
+        data: resized.buffer.asUint8List(),
+      ),
       false,
       const <ImageStretches?>[],
       const <ImageStretches?>[],
       null,
     );
+    return true;
   } catch (e) {
-    debugPrint('[PngToMapbox] Error cargando $imageId: $e');
+    if (kDebugMode) debugPrint('[PngToMapbox] Error cargando $imageId: $e');
+    return false;
   }
 }
