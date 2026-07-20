@@ -122,21 +122,23 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   Future<void> _loadPinImages() async {
     if (_pinImagesLoaded || _mapboxMap == null) return;
     try {
-      await addPngPinToMap(
+      final verdeOk = await addPngPinToMap(
         _mapboxMap!,
         'pin-verde',
         'lib/shared/icons/map-icons/Pin-Verde.png',
         width: 30,
         height: 36,
       );
-      await addPngPinToMap(
+      final naranjaOk = await addPngPinToMap(
         _mapboxMap!,
         'pin-naranja',
         'lib/shared/icons/map-icons/Pin-Naranja.png',
         width: 30,
         height: 36,
       );
-      _pinImagesLoaded = true;
+      // Ambas imágenes deben quedar registradas; si alguna falló, las
+      // anotaciones apuntarían a imágenes inexistentes (marcador invisible).
+      _pinImagesLoaded = verdeOk && naranjaOk;
     } catch (e) {
       debugPrint('[TripSearching] Error cargando pines PNG: $e');
     }

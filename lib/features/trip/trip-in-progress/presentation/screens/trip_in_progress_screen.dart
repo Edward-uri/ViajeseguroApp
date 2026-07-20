@@ -96,28 +96,30 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   Future<void> _loadPinImages() async {
     if (_pinImagesLoaded || _mapboxMap == null) return;
     try {
-      await addPngPinToMap(
+      final verdeOk = await addPngPinToMap(
         _mapboxMap!,
         'pin-verde',
         'lib/shared/icons/map-icons/Pin-Verde.png',
         width: 30,
         height: 36,
       );
-      await addPngPinToMap(
+      final naranjaOk = await addPngPinToMap(
         _mapboxMap!,
         'pin-naranja',
         'lib/shared/icons/map-icons/Pin-Naranja.png',
         width: 30,
         height: 36,
       );
-      await addPngPinToMap(
+      final mototaxiOk = await addPngPinToMap(
         _mapboxMap!,
         'mototaxi-mapa',
         'lib/shared/icons/map-icons/MototaxiMapa.png',
         width: 40,
         height: 40,
       );
-      _pinImagesLoaded = true;
+      // Las tres imágenes deben quedar registradas; si alguna falló, las
+      // anotaciones apuntarían a imágenes inexistentes (marcador invisible).
+      _pinImagesLoaded = verdeOk && naranjaOk && mototaxiOk;
     } catch (e) {
       debugPrint('[TripInProgress] Error cargando pines PNG: $e');
     }
