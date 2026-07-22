@@ -27,24 +27,36 @@ class AuthImageProvider extends ImageProvider<AuthImageProvider> {
   ) {
     return MultiFrameImageStreamCompleter(
       scale: 1.0,
+      // Reintenta ante fallos transitorios (red intermitente o token aún no
+      // disponible en el primer frame). Sin esto, un fallo puntual quedaba
+      // cacheado por el Image y la foto "a veces no se mostraba" todo el viaje.
+      // El 404 (usuario sin foto) es definitivo: cae al fallback sin reintentar.
       codec: () async {
         final url = '${apiClient.baseUrl}${ApiRoutes.usersPhoto(userId)}';
-        final token = apiClient.currentToken;
-
-        final request = http.Request('GET', Uri.parse(url));
-        request.headers['Accept'] = 'image/*';
-        if (token != null) {
-          request.headers['Authorization'] = 'Bearer $token';
+        for (var intento = 0; ; intento++) {
+          final ultimo = intento >= 2;
+          int? status;
+          try {
+            final token = apiClient.currentToken;
+            final request = http.Request('GET', Uri.parse(url));
+            request.headers['Accept'] = 'image/*';
+            if (token != null) {
+              request.headers['Authorization'] = 'Bearer $token';
+            }
+            final response = await http.Client().send(request);
+            status = response.statusCode;
+            if (status == 200) {
+              final bytes = await response.stream.toBytes();
+              return decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+            }
+          } catch (_) {
+            if (ultimo) rethrow;
+          }
+          if (status == 404 || ultimo) {
+            throw Exception('No se pudo cargar imagen (status: $status)');
+          }
+          await Future.delayed(Duration(milliseconds: 250 * (intento + 1)));
         }
-
-        final response = await http.Client().send(request);
-        if (response.statusCode != 200) {
-          throw Exception('Error ${response.statusCode} al cargar imagen');
-        }
-
-        final bytes = await response.stream.toBytes();
-        final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-        return decode(buffer);
       }(),
       informationCollector: () => [
         ErrorDescription('Image provider for user $userId'),
