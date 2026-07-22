@@ -181,6 +181,32 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
     state = const TripSearchingViewModelState();
   }
 
+  /// Vacía el origen para volver a elegirlo (marcador, búsqueda o ubicación
+  /// actual). Reaparece el botón de "usar ubicación actual" (origin == null).
+  void clearOrigin() {
+    state = state.copyWith(
+      origin: null,
+      step: TripSearchingStep.selectingOrigin,
+      activeInput: LocationInputMode.origin,
+      searchQuery: '',
+      searchResults: [],
+      isPickingOnMap: false,
+    );
+  }
+
+  /// Vacía el destino para volver a elegirlo.
+  void clearDestination() {
+    if (state.origin == null) return;
+    state = state.copyWith(
+      destination: null,
+      step: TripSearchingStep.selectingDestination,
+      activeInput: LocationInputMode.destination,
+      searchQuery: '',
+      searchResults: [],
+      isPickingOnMap: false,
+    );
+  }
+
   void clearError() {
     if (state.errorMessage == null && state.searchError == null) return;
     state = state.copyWith(errorMessage: null, searchError: null);
@@ -350,8 +376,8 @@ class TripSearchingViewModelState extends Equatable {
   TripSearchingViewModelState copyWith({
     TripSearchingStep? step,
     LocationInputMode? activeInput,
-    TripLocation? origin,
-    TripLocation? destination,
+    Object? origin = _sentinel,
+    Object? destination = _sentinel,
     Trip? trip,
     EstimacionViaje? estimacion,
     int? numPersonas,
@@ -369,8 +395,10 @@ class TripSearchingViewModelState extends Equatable {
     return TripSearchingViewModelState(
       step: step ?? this.step,
       activeInput: activeInput ?? this.activeInput,
-      origin: origin ?? this.origin,
-      destination: destination ?? this.destination,
+      origin: identical(origin, _sentinel) ? this.origin : origin as TripLocation?,
+      destination: identical(destination, _sentinel)
+          ? this.destination
+          : destination as TripLocation?,
       trip: trip ?? this.trip,
       estimacion: estimacion ?? this.estimacion,
       numPersonas: numPersonas ?? this.numPersonas,

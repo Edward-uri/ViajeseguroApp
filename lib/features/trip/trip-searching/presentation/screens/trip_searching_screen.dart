@@ -663,6 +663,10 @@ class _LocationInputs extends StatelessWidget {
             notifier.setSearchQuery(value);
           }
         },
+        onClear: () {
+          originController.clear();
+          notifier.clearOrigin();
+        },
       ),
       const SizedBox(height: 12),
       _LocationField(
@@ -686,6 +690,10 @@ class _LocationInputs extends StatelessWidget {
           if (!vm.isPickingOnMap) {
             notifier.setSearchQuery(value);
           }
+        },
+        onClear: () {
+          destinationController.clear();
+          notifier.clearDestination();
         },
       ),
     ],
@@ -763,6 +771,7 @@ class _LocationField extends StatelessWidget {
     required this.onTap,
     required this.onPinTap,
     required this.onChanged,
+    required this.onClear,
   });
 
   final String label;
@@ -775,6 +784,7 @@ class _LocationField extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onPinTap;
   final void Function(String) onChanged;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
@@ -822,6 +832,24 @@ class _LocationField extends StatelessWidget {
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
+            ),
+            // Botón de limpiar: aparece cuando el campo tiene texto (para
+            // vaciar y volver a elegir el punto). Oculto al elegir en el mapa.
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (_, value, _) {
+                if (value.text.isEmpty || !enabled || isPickingOnMap) {
+                  return const SizedBox.shrink();
+                }
+                return GestureDetector(
+                  onTap: onClear,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Icon(Icons.close_rounded,
+                        size: 18, color: colors.onSurfaceVariant),
+                  ),
+                );
+              },
             ),
             const SizedBox(width: 8),
             GestureDetector(
