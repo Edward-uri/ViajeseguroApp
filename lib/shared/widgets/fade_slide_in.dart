@@ -56,7 +56,9 @@ class _FadeSlideInState extends State<FadeSlideIn>
       opacity: _fadeAnim,
       child: SlideTransition(
         position: _slideAnim,
-        child: widget.child,
+        // RepaintBoundary: el hijo se rasteriza una vez y el fade compone una
+        // capa cacheada (compositing GPU) en vez de rasterizar cada frame.
+        child: RepaintBoundary(child: widget.child),
       ),
     );
   }
