@@ -22,19 +22,25 @@ class PassengerHomeViewModel extends StateNotifier<PassengerHomeViewModelState> 
     final cached = _currentUserNotifier.user;
     if (cached != null) {
       state = state.copyWith(user: cached, isLoading: false);
-    } else if (!state.isLoading) {
+    } else {
       state = state.copyWith(isLoading: true, errorMessage: null);
-      try {
-        final user = await _profileRepo.getMe();
-        _currentUserNotifier.setUser(user);
-        state = state.copyWith(user: user, isLoading: false);
-      } catch (_) {
-        state = state.copyWith(
-          isLoading: false,
-          errorMessage: 'No se pudo cargar el perfil',
-        );
-      }
     }
+
+    // El usuario de la sesion (login/restauracion) no incluye `nombre`; solo
+    // /api/users/me lo trae. Pedirlo siempre para mostrar el nombre real del
+    // pasajero en el menu y el saludo del home. Si falla pero hay usuario en
+    // cache, se conserva sin marcar error.
+    try {
+      final user = await _profileRepo.getMe();
+      _currentUserNotifier.setUser(user);
+      state = state.copyWith(user: user, isLoading: false);
+    } catch (_) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage: cached == null ? 'No se pudo cargar el perfil' : null,
+      );
+    }
+
     // Limpiar viaje activo inmediatamente para que la UI muestre
     // la barra de busqueda mientras se verifica con el backend.
     state = state.copyWith(activeTrip: null);

@@ -29,15 +29,24 @@ class AuthImageProvider extends ImageProvider<AuthImageProvider> {
       scale: 1.0,
       codec: () async {
         final url = '${apiClient.baseUrl}${ApiRoutes.usersPhoto(userId)}';
-        final token = apiClient.currentToken;
 
-        final request = http.Request('GET', Uri.parse(url));
-        request.headers['Accept'] = 'image/*';
-        if (token != null) {
-          request.headers['Authorization'] = 'Bearer $token';
+        Future<http.StreamedResponse> fetch(String? token) {
+          final request = http.Request('GET', Uri.parse(url));
+          request.headers['Accept'] = 'image/*';
+          if (token != null) {
+            request.headers['Authorization'] = 'Bearer $token';
+          }
+          return http.Client().send(request);
         }
 
-        final response = await http.Client().send(request);
+        // En arranque en frio `currentToken` es null hasta la primera peticion
+        // autenticada; leerlo del storage garantiza que la (unica) resolucion
+        // de esta imagen salga siempre autenticada. Si el token expiro, se
+        // refresca una vez y se reintenta.
+        var response = await fetch(await apiClient.ensureToken());
+        if (response.statusCode == 401 && await apiClient.refreshSession()) {
+          response = await fetch(apiClient.currentToken);
+        }
         if (response.statusCode != 200) {
           throw Exception('Error ${response.statusCode} al cargar imagen');
         }
