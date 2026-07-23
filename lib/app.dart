@@ -6,6 +6,7 @@ import 'core/navigation/app_navigator.dart';
 import 'core/widgets/page_transitions.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
+import 'features/help/presentation/screens/help_center_screen.dart';
 import 'features/passenger/home/presentation/screens/passenger_home_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/splash/presentation/splash_screen.dart';
@@ -58,6 +59,8 @@ class JalaApp extends ConsumerWidget {
           case AppRoutes.tripEvaluation:
             final trip = settings.arguments as Trip;
             return PageTransitions.slideUp(TripEvaluationScreen(trip: trip));
+          case AppRoutes.helpCenter:
+            return PageTransitions.scaleFade(const HelpCenterScreen());
           default:
             return PageTransitions.fadeThrough(const LoginScreen());
         }

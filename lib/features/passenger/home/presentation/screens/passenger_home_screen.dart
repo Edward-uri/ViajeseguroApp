@@ -1,3 +1,4 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -345,7 +346,7 @@ class _ProfileTabContent extends ConsumerWidget {
                     JalaSidebarOption(
                       icon: Icons.notifications_outlined,
                       label: 'Notificaciones',
-                      onTap: () {},
+                      onTap: () => _openNotificationSettings(context),
                     ),
                     JalaSidebarOption(
                       icon: Icons.dark_mode_outlined,
@@ -361,7 +362,8 @@ class _ProfileTabContent extends ConsumerWidget {
                     JalaSidebarOption(
                       icon: Icons.help_outline_rounded,
                       label: 'Centro de ayuda',
-                      onTap: () {},
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRoutes.helpCenter),
                     ),
                     JalaSidebarOption(
                       icon: Icons.description_outlined,
@@ -420,6 +422,21 @@ class _ProfileTabContent extends ConsumerWidget {
     );
     if (selected != null) {
       ref.read(themeModeProvider.notifier).setMode(selected);
+    }
+  }
+
+  Future<void> _openNotificationSettings(BuildContext context) async {
+    try {
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('No se pudo abrir la configuracion de notificaciones'),
+          ),
+        );
+      }
     }
   }
 }
