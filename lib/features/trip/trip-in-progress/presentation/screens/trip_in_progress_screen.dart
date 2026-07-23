@@ -117,9 +117,10 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
         width: 40,
         height: 40,
       );
-      // Las tres imágenes deben quedar registradas; si alguna falló, las
-      // anotaciones apuntarían a imágenes inexistentes (marcador invisible).
+      // Marcar como cargado solo si TODAS las imágenes quedaron registradas.
+      // Si alguna falló, no marcar — el caller reintentará en el siguiente tick.
       _pinImagesLoaded = verdeOk && naranjaOk && mototaxiOk;
+      debugPrint('[TripInProgress] Pines cargados: verde=$verdeOk, naranja=$naranjaOk, mototaxi=$mototaxiOk');
     } catch (e) {
       debugPrint('[TripInProgress] Error cargando pines PNG: $e');
     }
@@ -130,6 +131,7 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   /// en curso → origen→destino (se acorta al acercarse al destino);
   /// sin posición del conductor → ruta completa origen→destino.
   void _syncRoute() async {
+    if (!mounted) return;
     final manager = _polylineManager;
     if (manager == null) return;
 
@@ -292,9 +294,21 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
   }
 
   void _updateDriverMarker(DriverPosition pos) async {
+    if (!mounted) return;
+    // Si las imágenes no están cargadas aún, cargarlas ahora y reintentar.
+    if (!_pinImagesLoaded) {
+      await _loadPinImages();
+      if (!_pinImagesLoaded) {
+        debugPrint('[TripInProgress] Pines no cargados aún, reintentando...');
+        return;
+      }
+    }
+
     final manager = _driverMarkerManager;
-    // Si el icono aún no está cargado, el siguiente tick de posición lo dibuja.
-    if (manager == null || !_pinImagesLoaded) return;
+    if (manager == null) {
+      debugPrint('[TripInProgress] DriverMarkerManager no disponible');
+      return;
+    }
 
     // Solo mostrar el marcador si el viaje está aceptado o en curso.
     final status = ref.read(tripInProgressViewModelProvider).trip?.status;
@@ -309,6 +323,7 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
           iconImage: 'mototaxi-mapa',
           iconSize: 1.0,
         ));
+        debugPrint('[TripInProgress] Marcador del conductor creado en (${pos.latitude}, ${pos.longitude})');
       } else {
         // Mover el marcador existente (no recrear: evita parpadeo).
         _driverMarker!.geometry = point;
@@ -327,27 +342,31 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
     ref.listen<TripInProgressViewModelState>(
       tripInProgressViewModelProvider,
       (previous, next) {
+        if (!mounted) return;
+
         // Actualizar marcador del conductor y recortar la ruta en tiempo real
         if (next.driverPosition != null &&
             next.driverPosition != previous?.driverPosition) {
+          debugPrint('[TripInProgress] DriverPosition recibida: ${next.driverPosition!.latitude}, ${next.driverPosition!.longitude}');
           _updateDriverMarker(next.driverPosition!);
           _syncRoute();
         }
 
         // Cambio de fase (p.ej. aceptado → en curso): redibujar la ruta.
         if (next.trip?.status != previous?.trip?.status) {
+          debugPrint('[TripInProgress] Status cambió: ${previous?.trip?.status} → ${next.trip?.status}');
           _syncRoute();
         }
 
         // Al completar: pasar a calificar al conductor. Al cancelar: ir al home.
         final status = next.trip?.status;
-        if (status == TripStatus.completado && mounted) {
+        if (status == TripStatus.completado) {
           Navigator.of(context).pushNamedAndRemoveUntil(
             AppRoutes.tripEvaluation,
             (route) => false,
             arguments: next.trip,
           );
-        } else if (status == TripStatus.cancelado && mounted) {
+        } else if (status == TripStatus.cancelado) {
           Navigator.of(context).pushNamedAndRemoveUntil(
             AppRoutes.passengerHome,
             (route) => false,

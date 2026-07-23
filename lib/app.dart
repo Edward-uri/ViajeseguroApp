@@ -35,8 +35,6 @@ class JalaApp extends ConsumerWidget {
       builder: DevicePreview.appBuilder,
       theme: theme.light(),
       darkTheme: theme.dark(),
-      // Claro/oscuro elegido por el usuario; en "sistema" sigue en vivo
-      // los cambios del SO (el themeMode fijo anterior no lo hacía).
       themeMode: ref.watch(themeModeProvider),
       initialRoute: AppRoutes.splash,
       onGenerateRoute: (settings) {

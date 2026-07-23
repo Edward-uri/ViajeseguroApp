@@ -8,6 +8,7 @@ import '../env/api_config.dart';
 import '../routes/api_routes.dart';
 import '../storage/auth_storage.dart';
 import 'api_exception.dart';
+import 'certificate_pinning.dart';
 
 typedef OnAuthFailure = void Function();
 
@@ -83,6 +84,14 @@ class ApiClient {
   }
 
   Future<void> delete(String path, {bool auth = true}) async {
+    // Verificar certificado SSL antes de la petición
+    final isSecure = await CertificatePinning.instance.check();
+    if (!isSecure) {
+      throw SecurityException(
+        'Conexión interceptada. Tu red no es segura.',
+      );
+    }
+
     final headers = await _headers(auth: auth);
     final response = await _runWithErrors(
       () => _client.delete(_uri(path), headers: headers),
@@ -130,6 +139,15 @@ class ApiClient {
     bool hasBody = false,
     bool isRetry = false,
   }) async {
+    // Verificar certificado SSL antes de cada petición
+    final isSecure = await CertificatePinning.instance.check();
+    if (!isSecure) {
+      throw SecurityException(
+        'Conexión interceptada. Tu red no es segura. '
+        'Verifica que no estés usando un proxy o certificado no válido.',
+      );
+    }
+
     final headers = await _headers(auth: auth, hasBody: hasBody);
     final response = await _runWithErrors(() => requestBuilder(headers));
 

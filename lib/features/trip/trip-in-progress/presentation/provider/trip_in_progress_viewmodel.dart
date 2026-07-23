@@ -57,6 +57,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     // viaje:aceptado → objeto Viaje completo del viaje aceptado
     // El conductor aceptó: refrescar para obtener datos completos del conductor
     _acceptedSub = _socketService.onTripAccepted.listen((event) async {
+      debugPrint('[TripInProgressVM] WS viaje:aceptado recibido, idViaje=${event.idViaje}, esperado=$tripIdInt');
       if (event.idViaje != tripIdInt) return;
       // Refrescar para obtener driverName, driverPhone, vehicleInfo, etc.
       await _refreshTrip(tripId);
@@ -65,6 +66,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     // viaje:cambio_estado → { idViaje, estado }
     // en_curso, completado, cancelado, solicitado (regreso del conductor)
     _stateChangeSub = _socketService.onTripStateChanged.listen((event) async {
+      debugPrint('[TripInProgressVM] WS viaje:cambio_estado recibido, idViaje=${event.idViaje}, estado=${event.estado}');
       if (event.idViaje != tripIdInt) return;
       final newStatus = event.estado;
       if (newStatus == null) return;

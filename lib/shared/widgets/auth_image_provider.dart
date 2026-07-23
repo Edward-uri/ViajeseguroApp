@@ -27,9 +27,12 @@ class AuthImageProvider extends ImageProvider<AuthImageProvider> {
   ) {
     return MultiFrameImageStreamCompleter(
       scale: 1.0,
+      // Reintenta ante fallos transitorios (red intermitente o token aún no
+      // disponible en el primer frame). Sin esto, un fallo puntual quedaba
+      // cacheado por el Image y la foto "a veces no se mostraba" todo el viaje.
+      // El 404 (usuario sin foto) es definitivo: cae al fallback sin reintentar.
       codec: () async {
         final url = '${apiClient.baseUrl}${ApiRoutes.usersPhoto(userId)}';
-
         Future<http.StreamedResponse> fetch(String? token) {
           final request = http.Request('GET', Uri.parse(url));
           request.headers['Accept'] = 'image/*';
@@ -39,21 +42,32 @@ class AuthImageProvider extends ImageProvider<AuthImageProvider> {
           return http.Client().send(request);
         }
 
-        // En arranque en frio `currentToken` es null hasta la primera peticion
-        // autenticada; leerlo del storage garantiza que la (unica) resolucion
-        // de esta imagen salga siempre autenticada. Si el token expiro, se
-        // refresca una vez y se reintenta.
-        var response = await fetch(await apiClient.ensureToken());
-        if (response.statusCode == 401 && await apiClient.refreshSession()) {
-          response = await fetch(apiClient.currentToken);
+        for (var intento = 0; ; intento++) {
+          final ultimo = intento >= 2;
+          int? status;
+          try {
+            // Leer el token del storage: en arranque en frio `currentToken` es
+            // null hasta la primera peticion autenticada; sin esto la foto salia
+            // sin Authorization y fallaba todo el viaje.
+            var response = await fetch(await apiClient.ensureToken());
+            // Token expirado: refrescar una vez y reintentar en el acto.
+            if (response.statusCode == 401 &&
+                await apiClient.refreshSession()) {
+              response = await fetch(apiClient.currentToken);
+            }
+            status = response.statusCode;
+            if (status == 200) {
+              final bytes = await response.stream.toBytes();
+              return decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+            }
+          } catch (_) {
+            if (ultimo) rethrow;
+          }
+          if (status == 404 || ultimo) {
+            throw Exception('No se pudo cargar imagen (status: $status)');
+          }
+          await Future.delayed(Duration(milliseconds: 250 * (intento + 1)));
         }
-        if (response.statusCode != 200) {
-          throw Exception('Error ${response.statusCode} al cargar imagen');
-        }
-
-        final bytes = await response.stream.toBytes();
-        final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
-        return decode(buffer);
       }(),
       informationCollector: () => [
         ErrorDescription('Image provider for user $userId'),
