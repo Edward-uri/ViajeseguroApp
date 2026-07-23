@@ -17,7 +17,11 @@ import '../../domain/entities/trip_location.dart';
 import '../provider/trip_searching_viewmodel.dart';
 
 class TripSearchingScreen extends ConsumerStatefulWidget {
-  const TripSearchingScreen({super.key});
+  const TripSearchingScreen({super.key, this.presetDestination});
+
+  /// Si viene, se abre con origen = ubicacion actual y este destino precargado
+  /// (tap en un destino guardado desde la home).
+  final TripLocation? presetDestination;
 
   @override
   ConsumerState<TripSearchingScreen> createState() => _TripSearchingScreenState();
@@ -38,9 +42,18 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(tripSearchingViewModelProvider.notifier).resetAll();
-      _getCurrentLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notifier = ref.read(tripSearchingViewModelProvider.notifier);
+      notifier.resetAll();
+      await _getCurrentLocation();
+      final preset = widget.presetDestination;
+      if (preset != null && _currentPosition != null && mounted) {
+        await notifier.presetTrip(
+          originLat: _currentPosition!.latitude,
+          originLng: _currentPosition!.longitude,
+          destination: preset,
+        );
+      }
     });
   }
 
@@ -396,13 +409,15 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   }
 
   double _bottomPanelHeight(TripSearchingViewModelState vm) {
+    // Al elegir en el mapa el panel se colapsa (solo el panel de confirmar),
+    // asi el pin del marcador queda visible arriba.
+    if (vm.isPickingOnMap) return 180;
     double base = 340;
     // Selector viaje/paquete (46px + 18px de separacion); solo visible mientras
     // no se muestra la tarifa.
     if (vm.step != TripSearchingStep.fareShown) base += 64;
     if (vm.searchResults.isNotEmpty || vm.isSearching) base += 200;
     if (vm.hasRoute) base += 80;
-    if (vm.isPickingOnMap) base += 20;
     return base;
   }
 
@@ -475,32 +490,36 @@ class _BottomPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (vm.step != TripSearchingStep.fareShown) ...[
-                    _ServiceTypeSelector(
-                      selected: vm.tipoServicio,
-                      onChanged: notifier.setTipoServicio,
+                  // Al elegir en el mapa se ocultan selector/titulo/inputs para
+                  // que el pin del marcador quede visible (antes lo tapaban).
+                  if (!vm.isPickingOnMap) ...[
+                    if (vm.step != TripSearchingStep.fareShown) ...[
+                      _ServiceTypeSelector(
+                        selected: vm.tipoServicio,
+                        onChanged: notifier.setTipoServicio,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    Text(
+                      vm.tipoServicio == TipoServicio.envio
+                          ? 'A donde lo envias?'
+                          : 'A donde vas?',
+                      style: context.text.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.onSurface,
+                      ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
+                    _LocationInputs(
+                      vm: vm,
+                      notifier: notifier,
+                      originController: originController,
+                      destinationController: destinationController,
+                      originFocusNode: originFocusNode,
+                      destinationFocusNode: destinationFocusNode,
+                    ),
+                    const _SectionSpacer(isVisible: true),
                   ],
-                  Text(
-                    vm.tipoServicio == TipoServicio.envio
-                        ? 'A donde lo envias?'
-                        : 'A donde vas?',
-                    style: context.text.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _LocationInputs(
-                    vm: vm,
-                    notifier: notifier,
-                    originController: originController,
-                    destinationController: destinationController,
-                    originFocusNode: originFocusNode,
-                    destinationFocusNode: destinationFocusNode,
-                  ),
-                  const _SectionSpacer(isVisible: true),
                   _AnimatedSection(
                     visible: vm.isPickingOnMap,
                     sectionKey: 'pickOnMap',
@@ -538,11 +557,14 @@ class _BottomPanel extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _PassengerSelector(
-                          count: vm.numPersonas,
-                          onChanged: notifier.setNumPersonas,
-                        ),
-                        const SizedBox(height: 12),
+                        // Un paquete no lleva pasajeros.
+                        if (vm.tipoServicio != TipoServicio.envio) ...[
+                          _PassengerSelector(
+                            count: vm.numPersonas,
+                            onChanged: notifier.setNumPersonas,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton(
@@ -556,7 +578,9 @@ class _BottomPanel extends StatelessWidget {
                                     width: 18,
                                     child: CircularProgressIndicator(strokeWidth: 2),
                                   )
-                                : const Text('Estimar viaje'),
+                                : Text(vm.tipoServicio == TipoServicio.envio
+                                    ? 'Estimar envio'
+                                    : 'Estimar viaje'),
                           ),
                         ),
                       ],
@@ -639,7 +663,7 @@ class _ServiceTypeSelector extends StatelessWidget {
       child: Row(
         children: [
           _ServiceTypeOption(
-            icon: Icons.two_wheeler_rounded,
+            icon: Icons.electric_rickshaw_rounded,
             label: 'Viaje',
             isActive: selected != TipoServicio.envio,
             onTap: () => onChanged(TipoServicio.viaje),
@@ -762,8 +786,12 @@ class _LocationInputs extends StatelessWidget {
           }
         },
         onClear: () {
+          // Al quitar el origen se reinicia el destino tambien; mover el foco al
+          // origen (el destino queda deshabilitado) evita que la UI se trabe.
           originController.clear();
+          destinationController.clear();
           notifier.clearOrigin();
+          originFocusNode.requestFocus();
         },
       ),
       const SizedBox(height: 12),

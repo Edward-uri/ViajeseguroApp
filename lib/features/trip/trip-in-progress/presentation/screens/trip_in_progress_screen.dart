@@ -410,14 +410,6 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
               },
             ),
           ),
-          Positioned(
-            top: topPad + 16,
-            right: 24,
-            child: JalaBackButton(
-              icon: Icons.menu_rounded,
-              onTap: () {},
-            ),
-          ),
           // Panel: se reconstruye con el viaje (poll de 5s) o isLoading,
           // NO en cada tick de driverPosition (que no se renderiza).
           Positioned(
@@ -1185,7 +1177,11 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
         24,
         24,
         24,
-        MediaQuery.of(context).viewInsets.bottom + 24,
+        // Teclado (viewInsets) + barra de navegacion del telefono (padding),
+        // sin doble conteo: el boton de confirmar ya no queda tapado abajo.
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            24,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
