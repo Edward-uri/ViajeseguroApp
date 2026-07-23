@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/jala_theme.dart';
+import '../../../../reportes/presentation/reportar_sheet.dart';
 import '../../../trip-in-progress/domain/entities/tipo_servicio.dart';
 import '../../domain/entities/trip_history_item.dart';
 import '../provider/trip_history_viewmodel.dart';
@@ -439,6 +440,31 @@ class _TripHistoryCard extends StatelessWidget {
               ),
             ],
           ),
+          if (isCompletado) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () {
+                  final id = int.tryParse(item.id);
+                  if (id != null) {
+                    mostrarReportarConductorSheet(context, idViaje: id);
+                  }
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: context.brand.destructive,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                icon: const Icon(Icons.flag_outlined, size: 15),
+                label: const Text('Reportar conductor',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
         ],
       ),
     );

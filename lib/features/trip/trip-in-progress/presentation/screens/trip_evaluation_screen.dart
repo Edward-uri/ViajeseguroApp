@@ -71,122 +71,141 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
     final scheme = Theme.of(context).colorScheme;
     final nombre = widget.trip.driverName ?? 'tu conductor';
 
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: scheme.surface,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 48),
-                // Badge de éxito: crece con rebote suave sobre fondo tenue.
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 80),
-                  child: Center(
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.4, end: 1.0),
-                      duration: const Duration(milliseconds: 650),
-                      curve: Curves.easeOutBack,
-                      builder: (context, scale, child) =>
-                          Transform.scale(scale: scale, child: child),
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          color: context.brand.successLight,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.check_rounded,
-                          color: context.brand.success,
-                          size: 52,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 180),
-                  child: Text(
-                    'Viaje completado',
-                    textAlign: TextAlign.center,
-                    style: text.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 260),
-                  child: Text(
-                    '¿Cómo estuvo tu viaje con $nombre?',
-                    textAlign: TextAlign.center,
-                    style: text.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 340),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (i) {
-                      final value = i + 1;
-                      final filled = value <= _rating;
-                      return IconButton(
-                        onPressed: _enviando
-                            ? null
-                            : () => setState(() {
-                                  _rating = value;
-                                  _error = null;
-                                }),
-                        iconSize: 40,
-                        icon: AnimatedScale(
-                          scale: filled ? 1.12 : 0.92,
-                          duration: const Duration(milliseconds: 220),
+        bottom: false,
+        child: Column(
+          children: [
+            // Contenido scrolleable: badge, calificacion y reseña.
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 16),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 80),
+                      child: Center(
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.4, end: 1.0),
+                          duration: const Duration(milliseconds: 650),
                           curve: Curves.easeOutBack,
-                          child: Icon(
-                            filled
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            color: filled
-                                ? JalaBrand.amber
-                                : context.brand.greyBorder,
+                          builder: (context, scale, child) =>
+                              Transform.scale(scale: scale, child: child),
+                          child: Container(
+                            width: 84,
+                            height: 84,
+                            decoration: BoxDecoration(
+                              color: context.brand.successLight,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.check_rounded,
+                              color: context.brand.success,
+                              size: 46,
+                            ),
                           ),
                         ),
-                      );
-                    }),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 420),
-                  child: TextField(
-                    controller: _comentario,
-                    enabled: !_enviando,
-                    maxLines: 3,
-                    maxLength: 160,
-                    decoration: InputDecoration(
-                      hintText: 'Deja un comentario (opcional)',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 180),
+                      child: Text(
+                        'Viaje completado',
+                        textAlign: TextAlign.center,
+                        style: text.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 260),
+                      child: Text(
+                        '¿Cómo estuvo tu viaje con $nombre?',
+                        textAlign: TextAlign.center,
+                        style: text.bodyMedium
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 340),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (i) {
+                          final value = i + 1;
+                          final filled = value <= _rating;
+                          return IconButton(
+                            onPressed: _enviando
+                                ? null
+                                : () => setState(() {
+                                      _rating = value;
+                                      _error = null;
+                                    }),
+                            iconSize: 40,
+                            icon: AnimatedScale(
+                              scale: filled ? 1.12 : 0.92,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutBack,
+                              child: Icon(
+                                filled
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                color: filled
+                                    ? JalaBrand.amber
+                                    : context.brand.greyBorder,
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 420),
+                      child: TextField(
+                        controller: _comentario,
+                        enabled: !_enviando,
+                        maxLines: 3,
+                        maxLength: 160,
+                        decoration: InputDecoration(
+                          hintText: 'Deja un comentario (opcional)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 4),
+                      Text(_error!,
+                          style: TextStyle(color: scheme.error, fontSize: 13)),
+                    ],
+                  ],
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 4),
-                  Text(_error!, style: TextStyle(color: scheme.error, fontSize: 13)),
-                ],
-                const SizedBox(height: 24),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 500),
-                  child: SizedBox(
-                    height: 54,
+              ),
+            ),
+            // Botones fijos abajo: siempre visibles sin necesidad de scroll.
+            Container(
+              padding: EdgeInsets.fromLTRB(24, 12, 24, bottomPad + 12),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                border: Border(top: BorderSide(color: context.brand.divider)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 52,
+                    width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _enviando ? null : _enviar,
                       style: ElevatedButton.styleFrom(
@@ -208,11 +227,8 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 540),
-                  child: SizedBox(
+                  const SizedBox(height: 8),
+                  SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: _enviando
@@ -227,7 +243,7 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
                       style: OutlinedButton.styleFrom(
                         foregroundColor: scheme.error,
                         side: BorderSide(color: scheme.error),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -238,17 +254,14 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
                               fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
                   ),
-                ),
-                FadeSlideIn(
-                  delay: const Duration(milliseconds: 560),
-                  child: TextButton(
+                  TextButton(
                     onPressed: _enviando ? null : _irAlHome,
                     child: const Text('Omitir'),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
