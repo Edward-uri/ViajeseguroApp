@@ -85,6 +85,10 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
 
       if (mounted) {
         setState(() => _currentPosition = position);
+        // Sesgar la busqueda de direcciones hacia la ubicacion del pasajero.
+        ref
+            .read(tripSearchingViewModelProvider.notifier)
+            .setSearchProximity(position.latitude, position.longitude);
         _flyTo(position.latitude, position.longitude);
       }
     } catch (e) {
@@ -501,23 +505,37 @@ class _BottomPanel extends StatelessWidget {
                       const SizedBox(height: 18),
                     ],
                     Text(
-                      vm.tipoServicio == TipoServicio.envio
-                          ? 'A donde lo envias?'
-                          : 'A donde vas?',
+                      vm.step == TripSearchingStep.fareShown
+                          ? (vm.tipoServicio == TipoServicio.envio
+                              ? 'Confirma tu envio'
+                              : 'Confirma tu viaje')
+                          : (vm.tipoServicio == TipoServicio.envio
+                              ? 'A donde lo envias?'
+                              : 'A donde vas?'),
                       style: context.text.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: context.colors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _LocationInputs(
-                      vm: vm,
-                      notifier: notifier,
-                      originController: originController,
-                      destinationController: destinationController,
-                      originFocusNode: originFocusNode,
-                      destinationFocusNode: destinationFocusNode,
-                    ),
+                    // Al confirmar (tarifa) se muestra un resumen limpio de la
+                    // ruta en vez de los campos editables (mas claro y minimal).
+                    if (vm.step == TripSearchingStep.fareShown &&
+                        vm.origin != null &&
+                        vm.destination != null)
+                      _RouteSummary(
+                        origin: vm.origin!,
+                        destination: vm.destination!,
+                      )
+                    else
+                      _LocationInputs(
+                        vm: vm,
+                        notifier: notifier,
+                        originController: originController,
+                        destinationController: destinationController,
+                        originFocusNode: originFocusNode,
+                        destinationFocusNode: destinationFocusNode,
+                      ),
                     const _SectionSpacer(isVisible: true),
                   ],
                   _AnimatedSection(
@@ -593,7 +611,10 @@ class _BottomPanel extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _EstimationCard(estimacion: vm.estimacion!),
+                          _EstimationCard(
+                            estimacion: vm.estimacion!,
+                            isPackage: vm.tipoServicio == TipoServicio.envio,
+                          ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -1466,9 +1487,10 @@ class _PassengerButton extends StatelessWidget {
 }
 
 class _EstimationCard extends StatelessWidget {
-  const _EstimationCard({required this.estimacion});
+  const _EstimationCard({required this.estimacion, required this.isPackage});
 
   final EstimacionViaje estimacion;
+  final bool isPackage;
 
   @override
   Widget build(BuildContext context) {
@@ -1483,22 +1505,21 @@ class _EstimationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Tarifa destacada
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
                 '\$${estimacion.tarifa.toStringAsFixed(0)}',
-                style: context.text.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                style: context.text.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
                   color: context.colors.onSurface,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 5),
               Text(
                 'MXN',
-                style: context.text.bodySmall?.copyWith(
+                style: context.text.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: context.brand.greyDark,
                 ),
@@ -1506,56 +1527,140 @@ class _EstimationCard extends StatelessWidget {
               const Spacer(),
               if (estimacion.tarifaEstimada)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: context.colors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     'Estimada',
                     style: context.text.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                       color: context.brand.greyDark,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          Divider(color: context.colors.outlineVariant, height: 1),
-          const SizedBox(height: 10),
-          // Detalles: distancia/tiempo y personas/precio-unitario
-          Row(
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
             children: [
-              Icon(Icons.route_rounded, size: 16, color: context.brand.greyDark),
-              const SizedBox(width: 6),
-              if (estimacion.distanciaKm > 0)
-                Text(
-                  '${estimacion.distanciaKm.toStringAsFixed(1)} km · ${estimacion.duracionMin.toStringAsFixed(0)} min',
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.brand.greyDark,
-                  ),
-                )
-              else
-                Text(
-                  'Zona fija',
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.brand.greyDark,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.group_rounded, size: 16, color: context.brand.greyDark),
-              const SizedBox(width: 6),
-              Text(
-                '${estimacion.personas} ${estimacion.personas == 1 ? "persona" : "personas"} · \$${estimacion.tarifaPorPersona.toStringAsFixed(0)} c/u',
-                style: context.text.bodySmall?.copyWith(
-                  color: context.brand.greyDark,
-                ),
+              _EstimationDetail(
+                icon: Icons.route_rounded,
+                label: estimacion.distanciaKm > 0
+                    ? '${estimacion.distanciaKm.toStringAsFixed(1)} km · ${estimacion.duracionMin.toStringAsFixed(0)} min'
+                    : 'Zona fija',
+              ),
+              _EstimationDetail(
+                icon: isPackage
+                    ? Icons.inventory_2_outlined
+                    : Icons.group_rounded,
+                label: isPackage
+                    ? 'Envio de paquete'
+                    : '${estimacion.personas} ${estimacion.personas == 1 ? "persona" : "personas"}',
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EstimationDetail extends StatelessWidget {
+  const _EstimationDetail({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: context.brand.greyDark),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style:
+              context.text.bodySmall?.copyWith(color: context.brand.greyDark),
+        ),
+      ],
+    );
+  }
+}
+
+/// Resumen limpio origen -> destino (linea con puntos) para la vista de
+/// confirmar, en vez de los campos editables.
+class _RouteSummary extends StatelessWidget {
+  const _RouteSummary({required this.origin, required this.destination});
+
+  final TripLocation origin;
+  final TripLocation destination;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: context.brand.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.brand.greyBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.brand.success,
+                  ),
+                ),
+                Container(
+                  width: 2,
+                  height: 22,
+                  color: context.brand.greyBorder,
+                ),
+                Icon(Icons.location_on, size: 15, color: JalaBrand.amber),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  origin.address,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: context.colors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  destination.address,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: context.colors.onSurface,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -40,6 +40,16 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
 
   Timer? _debounceTimer;
 
+  // Sesga la busqueda de direcciones hacia la ubicacion del pasajero (su
+  // municipio aparece primero, no direcciones de otros estados).
+  double? _proximityLat;
+  double? _proximityLng;
+
+  void setSearchProximity(double latitude, double longitude) {
+    _proximityLat = latitude;
+    _proximityLng = longitude;
+  }
+
   void activateOriginInput() {
     state = state.copyWith(
       activeInput: LocationInputMode.origin,
@@ -179,7 +189,11 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
     _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
       state = state.copyWith(isSearching: true, searchError: null);
       try {
-        final results = await _tripSearchRepository.searchAddress(query);
+        final results = await _tripSearchRepository.searchAddress(
+          query,
+          proximityLat: _proximityLat,
+          proximityLng: _proximityLng,
+        );
         state = state.copyWith(searchResults: results, isSearching: false);
       } catch (e) {
         state = state.copyWith(

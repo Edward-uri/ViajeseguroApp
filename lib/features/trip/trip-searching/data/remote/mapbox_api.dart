@@ -14,14 +14,23 @@ class MapboxApi {
   static const String _directionsBase =
       'https://api.mapbox.com/directions/v5/mapbox/driving';
 
-  Future<Map<String, dynamic>> searchAddress(String query) async {
+  Future<Map<String, dynamic>> searchAddress(
+    String query, {
+    double? proximityLat,
+    double? proximityLng,
+  }) async {
     final token = ApiConfig.mapboxToken;
     if (token.isEmpty) {
       return {'features': const []};
     }
     final encoded = Uri.encodeQueryComponent(query);
+    // proximity sesga los resultados hacia la ubicacion del pasajero (su
+    // municipio primero), en vez de direcciones de otros estados.
+    final proximity = (proximityLat != null && proximityLng != null)
+        ? '&proximity=$proximityLng,$proximityLat'
+        : '';
     final url = Uri.parse(
-      '$_geocodingBase/$encoded.json?access_token=$token&limit=5&language=es&country=mx',
+      '$_geocodingBase/$encoded.json?access_token=$token&limit=5&language=es&country=mx$proximity',
     );
     final response = await _client.get(url);
     if (response.statusCode < 200 || response.statusCode >= 300) {

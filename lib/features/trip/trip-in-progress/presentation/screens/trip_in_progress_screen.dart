@@ -1119,6 +1119,7 @@ class _CancelReasonDialog extends StatefulWidget {
   static const List<String> _reasons = [
     'Ya no necesito el viaje',
     'El conductor tarda mucho',
+    'No se encontro un conductor',
     'Cambié de opinión',
     'Otro',
   ];
@@ -1190,14 +1191,19 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
           const SizedBox(height: 4),
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: JalaBrand.amber.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: JalaBrand.amber.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      size: 22, color: JalaBrand.amber),
                 ),
-                child: const Icon(Icons.close_rounded, size: 22, color: JalaBrand.amber),
               ),
               const SizedBox(width: 12),
               Expanded(
