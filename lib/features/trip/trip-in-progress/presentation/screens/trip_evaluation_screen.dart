@@ -212,19 +212,31 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
                 const SizedBox(height: 4),
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 540),
-                  child: TextButton.icon(
-                    onPressed: _enviando
-                        ? null
-                        : () {
-                            final id = int.tryParse(widget.trip.id);
-                            if (id != null) {
-                              mostrarReportarConductorSheet(context,
-                                  idViaje: id);
-                            }
-                          },
-                    icon: Icon(Icons.flag_outlined, size: 18, color: scheme.error),
-                    label: Text('Reportar conductor',
-                        style: TextStyle(color: scheme.error)),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _enviando
+                          ? null
+                          : () {
+                              final id = int.tryParse(widget.trip.id);
+                              if (id != null) {
+                                mostrarReportarConductorSheet(context,
+                                    idViaje: id);
+                              }
+                            },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: scheme.error,
+                        side: BorderSide(color: scheme.error),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.flag_outlined, size: 18),
+                      label: const Text('Reportar conductor',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
                   ),
                 ),
                 FadeSlideIn(
