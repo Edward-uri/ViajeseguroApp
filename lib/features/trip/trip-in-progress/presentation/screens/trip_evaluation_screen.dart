@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../routes/app_routes.dart';
 import '../../../../../shared/widgets/fade_slide_in.dart';
 import '../../../../../theme/jala_theme.dart';
+import '../../../../reportes/presentation/reportar_sheet.dart';
 import '../../di/trip_in_progress_module.dart';
 import '../../domain/entities/trip.dart';
 
@@ -208,7 +209,24 @@ class _TripEvaluationScreenState extends ConsumerState<TripEvaluationScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
+                FadeSlideIn(
+                  delay: const Duration(milliseconds: 540),
+                  child: TextButton.icon(
+                    onPressed: _enviando
+                        ? null
+                        : () {
+                            final id = int.tryParse(widget.trip.id);
+                            if (id != null) {
+                              mostrarReportarConductorSheet(context,
+                                  idViaje: id);
+                            }
+                          },
+                    icon: Icon(Icons.flag_outlined, size: 18, color: scheme.error),
+                    label: Text('Reportar conductor',
+                        style: TextStyle(color: scheme.error)),
+                  ),
+                ),
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 560),
                   child: TextButton(
