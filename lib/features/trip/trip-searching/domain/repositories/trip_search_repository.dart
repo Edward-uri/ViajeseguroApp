@@ -1,7 +1,11 @@
 import '../entities/trip_location.dart';
 
 abstract class TripSearchRepository {
-  Future<List<TripLocation>> searchAddress(String query);
+  Future<List<TripLocation>> searchAddress(
+    String query, {
+    double? proximityLat,
+    double? proximityLng,
+  });
   Future<TripLocation> reverseGeocode(double latitude, double longitude);
   Future<List<List<double>>> getRoute({
     required double originLat,

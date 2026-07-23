@@ -48,11 +48,13 @@ class TripApi {
     int personas = 1,
     int? idZonaDestino,
     double? tarifaEstimada,
+    String tipoServicio = 'viaje',
   }) =>
       _api.post(
         ApiRoutes.viajes,
         body: <String, dynamic>{
           'idMunicipio': idMunicipio,
+          'tipoServicio': tipoServicio,
           'origen': {
             'lat': originLat,
             'lng': originLng,

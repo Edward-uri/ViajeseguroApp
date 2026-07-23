@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/auth/current_user_provider.dart';
 import '../../../../core/di/core_module.dart';
 import '../../../../core/http/api_client.dart';
 import '../../../../core/widgets/bubble_loader.dart';
@@ -66,13 +67,6 @@ class _ProfileView extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: context.colors.surface,
         title: const Text('Mi perfil'),
-        actions: [
-          IconButton(
-            tooltip: 'Recargar',
-            onPressed: vm.isLoading ? null : () => ref.read(profileViewModelProvider.notifier).loadProfile(),
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
       ),
       body: SafeArea(
         child: Builder(
@@ -177,6 +171,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
     final text = Theme.of(context).textTheme;
     final user = widget.user;
     final apiClient = ref.watch(apiClientProvider);
+    final photoVersion = ref.watch(profilePhotoVersionProvider);
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -194,6 +189,7 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
                     initials: user.iniciales,
                     isUploading: vm.isUploadingPhoto,
                     apiClient: apiClient,
+                    version: photoVersion,
                   ),
                   Positioned(
                     right: 0,
@@ -614,6 +610,10 @@ class _ProfileContentState extends ConsumerState<_ProfileContent> {
       contentType: contentType,
       fileName: file.name,
     );
+    if (ok) {
+      // Invalida el cache de la foto para que el menu y el perfil la recarguen.
+      ref.read(profilePhotoVersionProvider.notifier).state++;
+    }
     if (!context.mounted) return;
     final state = ref.read(profileViewModelProvider);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -707,6 +707,7 @@ class _Avatar extends StatelessWidget {
     required this.initials,
     required this.isUploading,
     required this.apiClient,
+    this.version = 0,
   });
 
   final int userId;
@@ -714,6 +715,7 @@ class _Avatar extends StatelessWidget {
   final String initials;
   final bool isUploading;
   final ApiClient apiClient;
+  final int version;
 
   @override
   Widget build(BuildContext context) {
@@ -738,6 +740,7 @@ class _Avatar extends StatelessWidget {
                 image: AuthImageProvider(
                   userId: userId,
                   apiClient: apiClient,
+                  version: version,
                 ),
                 width: 96,
                 height: 96,

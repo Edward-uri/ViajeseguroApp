@@ -9,7 +9,7 @@ class PageTransitions {
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
           opacity: animation,
-          child: child,
+          child: RepaintBoundary(child: child),
         );
       },
       transitionDuration: duration,
@@ -36,7 +36,7 @@ class PageTransitions {
               parent: animation,
               curve: Curves.easeOut,
             )),
-            child: child,
+            child: RepaintBoundary(child: child),
           ),
         );
       },
@@ -64,7 +64,7 @@ class PageTransitions {
               parent: animation,
               curve: Curves.easeOut,
             )),
-            child: child,
+            child: RepaintBoundary(child: child),
           ),
         );
       },
@@ -103,7 +103,7 @@ class PageTransitions {
               parent: animation,
               curve: Curves.easeOut,
             )),
-            child: child,
+            child: RepaintBoundary(child: child),
           ),
         );
       },

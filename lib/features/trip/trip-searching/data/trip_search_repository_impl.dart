@@ -8,8 +8,16 @@ class TripSearchRepositoryImpl implements TripSearchRepository {
   final MapboxApi _mapboxApi;
 
   @override
-  Future<List<TripLocation>> searchAddress(String query) async {
-    final response = await _mapboxApi.searchAddress(query);
+  Future<List<TripLocation>> searchAddress(
+    String query, {
+    double? proximityLat,
+    double? proximityLng,
+  }) async {
+    final response = await _mapboxApi.searchAddress(
+      query,
+      proximityLat: proximityLat,
+      proximityLng: proximityLng,
+    );
     final features = response['features'] as List<dynamic>? ?? const [];
 
     return features.map((feature) {

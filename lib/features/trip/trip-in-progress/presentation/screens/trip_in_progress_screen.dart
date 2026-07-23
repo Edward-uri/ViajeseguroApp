@@ -410,14 +410,6 @@ class _TripInProgressScreenState extends ConsumerState<TripInProgressScreen> {
               },
             ),
           ),
-          Positioned(
-            top: topPad + 16,
-            right: 24,
-            child: JalaBackButton(
-              icon: Icons.menu_rounded,
-              onTap: () {},
-            ),
-          ),
           // Panel: se reconstruye con el viaje (poll de 5s) o isLoading,
           // NO en cada tick de driverPosition (que no se renderiza).
           Positioned(
@@ -696,17 +688,7 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: context.brand.greyBorder,
-                  borderRadius: BorderRadius.circular(2.5),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 4),
             FadeSlideIn(
               delay: const Duration(milliseconds: 100),
               child: Text(
@@ -1137,6 +1119,7 @@ class _CancelReasonDialog extends StatefulWidget {
   static const List<String> _reasons = [
     'Ya no necesito el viaje',
     'El conductor tarda mucho',
+    'No se encontro un conductor',
     'Cambié de opinión',
     'Otro',
   ];
@@ -1195,33 +1178,32 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
         24,
         24,
         24,
-        MediaQuery.of(context).viewInsets.bottom + 24,
+        // Teclado (viewInsets) + barra de navegacion del telefono (padding),
+        // sin doble conteo: el boton de confirmar ya no queda tapado abajo.
+        MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            24,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: scheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 4),
           Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: JalaBrand.amber.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: JalaBrand.amber.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      size: 22, color: JalaBrand.amber),
                 ),
-                child: const Icon(Icons.close_rounded, size: 22, color: JalaBrand.amber),
               ),
               const SizedBox(width: 12),
               Expanded(

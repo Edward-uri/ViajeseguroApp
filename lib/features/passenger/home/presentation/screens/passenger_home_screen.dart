@@ -1,3 +1,4 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -11,8 +12,10 @@ import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/jala_theme.dart';
 import '../../../../../theme/theme_mode_provider.dart';
 import '../../../../auth/di/auth_module.dart';
+import '../../../../favorites/presentation/provider/favorites_viewmodel.dart';
 import '../../../../trip/trip-in-progress/domain/entities/trip.dart';
 import '../../../../trip/trip-in-progress/presentation/provider/trip_in_progress_viewmodel.dart';
+import '../../../../trip/trip-searching/domain/entities/trip_location.dart';
 import '../../../../trip/trip-history/presentation/screens/trip_history_screen.dart';
 import '../provider/passenger_home_viewmodel.dart';
 
@@ -24,13 +27,8 @@ class PassengerHomeScreen extends ConsumerStatefulWidget {
       _PassengerHomeScreenState();
 }
 
-class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
-    with SingleTickerProviderStateMixin {
+class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen> {
   MapboxMap? _mapboxMap;
-
-  // ── Tab crossfade animation ──────────────────────────────────────────
-  late final AnimationController _tabAnim;
-  int _prevTab = 0;
 
   // ── Nav destinations ─────────────────────────────────────────────────
   static const _navDestinations = [
@@ -42,35 +40,22 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
   @override
   void initState() {
     super.initState();
-    _tabAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-      value: 1.0,
-    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(passengerHomeViewModelProvider.notifier).loadUser();
+      ref.read(favoritesViewModelProvider.notifier).load();
       ref.read(socketServiceProvider).connect();
     });
   }
 
   @override
   void dispose() {
-    _tabAnim.dispose();
     ref.read(socketServiceProvider).disconnect();
     super.dispose();
   }
 
-  // ── Tab switching with crossfade ─────────────────────────────────────
   void _switchTab(int newIndex) {
-    final vm = ref.read(passengerHomeViewModelProvider.notifier);
-    final current = ref.read(passengerHomeViewModelProvider).selectedIndex;
-    if (newIndex == current) return;
-    _prevTab = current;
-    vm.selectTab(newIndex);
-    _tabAnim
-      ..reset()
-      ..forward();
+    ref.read(passengerHomeViewModelProvider.notifier).selectTab(newIndex);
   }
 
   // ── Location helpers ─────────────────────────────────────────────────
@@ -158,12 +143,38 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
     final userSubtitle = user?.correoElectronico ?? user?.telefono ?? '';
     final selected = vm.selectedIndex;
 
+    // Destinos guardados (favoritas) para la home: al tocar uno se abre el
+    // flujo de viaje con origen = ubicacion actual y destino = el favorito.
+    final savedAddresses = ref
+        .watch(favoritesViewModelProvider)
+        .items
+        .map((d) => JalaSavedAddress(
+              title: d.titulo,
+              subtitle: (d.etiqueta != null &&
+                      d.etiqueta!.isNotEmpty &&
+                      d.texto != null &&
+                      d.texto!.isNotEmpty)
+                  ? d.texto!
+                  : '',
+              onTap: () => Navigator.of(context).pushNamed(
+                AppRoutes.tripSearching,
+                arguments: TripLocation(
+                  address: d.texto ?? d.titulo,
+                  latitude: d.lat,
+                  longitude: d.lng,
+                  placeName: d.etiqueta,
+                ),
+              ),
+            ))
+        .toList();
+
     // Build the three tab contents once; IndexedStack keeps them alive.
     final tabs = [
       _HomeTabContent(
         key: const ValueKey('tab_home'),
         vm: vm,
         bottomPad: bottomPad,
+        savedAddresses: savedAddresses,
         onMapCreated: _onMapCreated,
         onLocationTap: _getCurrentLocation,
         onSearchTap: () => Navigator.of(context).pushNamed('/trip/searching'),
@@ -190,34 +201,16 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // ── Tabs with crossfade ─────────────────────────────────────
-          ...List.generate(3, (i) {
-            final isActive = i == selected;
-            return Positioned.fill(
-              child: AnimatedBuilder(
-                animation: _tabAnim,
-                builder: (context, _) {
-                  final double opacity;
-                  if (isActive) {
-                    // Incoming tab: fades in 0 → 1
-                    opacity = _tabAnim.value;
-                  } else if (i == _prevTab) {
-                    // Outgoing tab: fades out 1 → 0
-                    opacity = 1.0 - _tabAnim.value;
-                  } else {
-                    opacity = 0.0;
-                  }
-                  return IgnorePointer(
-                    ignoring: opacity < 0.01,
-                    child: Opacity(
-                      opacity: opacity.clamp(0.0, 1.0),
-                      child: tabs[i],
-                    ),
-                  );
-                },
-              ),
-            );
-          }),
+          // Tabs con IndexedStack: se mantienen vivos (el mapa no se reinicia)
+          // y solo se pinta el activo. Cambio instantaneo, sin el crossfade que
+          // compositaba el mapa con saveLayer cada frame (causaba el jank).
+          Positioned.fill(
+            child: IndexedStack(
+              index: selected,
+              sizing: StackFit.expand,
+              children: tabs,
+            ),
+          ),
 
           // ── Bottom nav bar ──────────────────────────────────────────
           Positioned(
@@ -242,6 +235,7 @@ class _HomeTabContent extends StatelessWidget {
     super.key,
     required this.vm,
     required this.bottomPad,
+    required this.savedAddresses,
     required this.onMapCreated,
     required this.onLocationTap,
     required this.onSearchTap,
@@ -250,6 +244,7 @@ class _HomeTabContent extends StatelessWidget {
 
   final PassengerHomeViewModelState vm;
   final double bottomPad;
+  final List<JalaSavedAddress> savedAddresses;
   final void Function(MapboxMap) onMapCreated;
   final VoidCallback onLocationTap;
   final VoidCallback onSearchTap;
@@ -281,6 +276,7 @@ class _HomeTabContent extends StatelessWidget {
           child: JalaHomeBottomSheet(
             greetingName: vm.greetingName,
             activeTrip: vm.activeTrip,
+            savedAddresses: savedAddresses,
             onSearchTap: onSearchTap,
             onActiveTripTap: onActiveTripTap,
           ),
@@ -346,7 +342,13 @@ class _ProfileTabContent extends ConsumerWidget {
                     JalaSidebarOption(
                       icon: Icons.notifications_outlined,
                       label: 'Notificaciones',
-                      onTap: () => _openAppSettings(context),
+                      onTap: () => _openNotificationSettings(context),
+                    ),
+                    JalaSidebarOption(
+                      icon: Icons.bookmark_outline_rounded,
+                      label: 'Direcciones favoritas',
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRoutes.favorites),
                     ),
                     JalaSidebarOption(
                       icon: Icons.dark_mode_outlined,
@@ -362,7 +364,8 @@ class _ProfileTabContent extends ConsumerWidget {
                     JalaSidebarOption(
                       icon: Icons.help_outline_rounded,
                       label: 'Centro de ayuda',
-                      onTap: () {},
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRoutes.helpCenter),
                     ),
                     JalaSidebarOption(
                       icon: Icons.description_outlined,
@@ -443,17 +446,16 @@ class _ProfileTabContent extends ConsumerWidget {
     }
   }
 
-  Future<void> _openAppSettings(BuildContext context) async {
+  Future<void> _openNotificationSettings(BuildContext context) async {
     try {
-      // En Android, abrir la configuración de la app directamente
-      const packageName = 'com.jala.pasajero';
-      final uri = Uri.parse('package:$packageName');
-      await launchUrl(uri);
-    } catch (e) {
-      debugPrint('[PassengerHome] No se pudo abrir la configuración: $e');
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+    } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir la configuración')),
+          const SnackBar(
+            content:
+                Text('No se pudo abrir la configuracion de notificaciones'),
+          ),
         );
       }
     }

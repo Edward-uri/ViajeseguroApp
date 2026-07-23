@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/auth/current_user_provider.dart';
 import '../../core/di/core_module.dart';
 import '../../theme/jala_theme.dart';
 import 'auth_image_provider.dart';
@@ -139,21 +140,27 @@ class _UserCard extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             alignment: Alignment.center,
             child: userId != null
-                ? Image(
-                    image: AuthImageProvider(
-                      userId: userId!,
-                      apiClient: apiClient,
-                    ),
-                    fit: BoxFit.cover,
-                    width: 64,
-                    height: 64,
-                    errorBuilder: (_, __, ___) => Text(
-                      initials,
-                      style: text.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
+                ? Consumer(
+                    builder: (context, ref, _) {
+                      final version = ref.watch(profilePhotoVersionProvider);
+                      return Image(
+                        image: AuthImageProvider(
+                          userId: userId!,
+                          apiClient: apiClient,
+                          version: version,
+                        ),
+                        fit: BoxFit.cover,
+                        width: 64,
+                        height: 64,
+                        errorBuilder: (_, __, ___) => Text(
+                          initials,
+                          style: text.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    },
                   )
                 : Text(
                     initials,

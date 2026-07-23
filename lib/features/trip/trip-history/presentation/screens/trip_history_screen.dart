@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/jala_theme.dart';
+import '../../../trip-in-progress/domain/entities/tipo_servicio.dart';
 import '../../domain/entities/trip_history_item.dart';
 import '../provider/trip_history_viewmodel.dart';
 
@@ -14,6 +15,9 @@ class TripHistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
+  // 0 = Todos, 1 = Viajes, 2 = Paquetes
+  int _filter = 0;
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +31,13 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
     final vm = ref.watch(tripHistoryViewModelProvider);
     final bottomPad = MediaQuery.of(context).padding.bottom;
     final topPad = MediaQuery.of(context).padding.top;
+    final items = _filter == 0
+        ? vm.items
+        : vm.items
+            .where((i) => _filter == 2
+                ? i.tipo == TipoServicio.envio
+                : i.tipo != TipoServicio.envio)
+            .toList();
 
     return SafeArea(
       bottom: false,
@@ -65,7 +76,10 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
                 const SizedBox(height: 16),
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 300),
-                  child: const _FilterTabs(),
+                  child: _FilterTabs(
+                    selected: _filter,
+                    onChanged: (i) => setState(() => _filter = i),
+                  ),
                 ),
               ],
             ),
@@ -76,19 +90,22 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : vm.items.isEmpty
                     ? _EmptyState(errorMessage: vm.errorMessage)
-                    : ListView.builder(
-                        padding: EdgeInsets.fromLTRB(24, 0, 24, 84 + bottomPad),
-                        itemCount: vm.items.length,
-                        itemBuilder: (context, index) {
-                          return FadeSlideIn(
-                            delay: Duration(milliseconds: 350 + (index * 80)),
-                            child: Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _TripHistoryCard(item: vm.items[index]),
-                            ),
-                          );
-                        },
-                      ),
+                    : items.isEmpty
+                        ? _EmptyFilter(isPaquetes: _filter == 2)
+                        : ListView.builder(
+                            padding:
+                                EdgeInsets.fromLTRB(24, 0, 24, 84 + bottomPad),
+                            itemCount: items.length,
+                            // Sin FadeSlideIn por item: al reciclarse durante el
+                            // scroll re-disparaba la animacion (delay creciente)
+                            // y las tarjetas "desaparecian" hasta soltar.
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _TripHistoryCard(item: items[index]),
+                              );
+                            },
+                          ),
           ),
         ],
       ),
@@ -96,15 +113,12 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
   }
 }
 
-class _FilterTabs extends StatefulWidget {
-  const _FilterTabs();
+class _FilterTabs extends StatelessWidget {
+  const _FilterTabs({required this.selected, required this.onChanged});
 
-  @override
-  State<_FilterTabs> createState() => _FilterTabsState();
-}
+  final int selected;
+  final ValueChanged<int> onChanged;
 
-class _FilterTabsState extends State<_FilterTabs> {
-  int _selected = 0;
   static const _labels = ['Todos', 'Viajes', 'Paquetes'];
 
   @override
@@ -118,10 +132,10 @@ class _FilterTabsState extends State<_FilterTabs> {
       ),
       child: Row(
         children: List.generate(_labels.length, (index) {
-          final isActive = _selected == index;
+          final isActive = selected == index;
           return Expanded(
             child: GestureDetector(
-              onTap: () => setState(() => _selected = index),
+              onTap: () => onChanged(index),
               child: Container(
                 decoration: BoxDecoration(
                   color: isActive ? context.colors.surfaceContainerLow : Colors.transparent,
@@ -200,6 +214,27 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
+class _EmptyFilter extends StatelessWidget {
+  const _EmptyFilter({required this.isPaquetes});
+
+  final bool isPaquetes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        isPaquetes ? 'No tienes envios de paquete' : 'No tienes viajes',
+        style: TextStyle(
+          fontFamily: 'Plus Jakarta Sans',
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: context.brand.greyDark,
+        ),
+      ),
+    );
+  }
+}
+
 class _TripHistoryCard extends StatelessWidget {
   const _TripHistoryCard({required this.item});
 
@@ -264,7 +299,7 @@ class _TripHistoryCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Icon(
-                  item.tipo.contains('paquete')
+                  item.tipo == TipoServicio.envio
                       ? Icons.inventory_2_outlined
                       : Icons.two_wheeler_outlined,
                   size: 22,
@@ -287,7 +322,7 @@ class _TripHistoryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      item.tipo,
+                      item.tipoLabel,
                       style: TextStyle(
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 12,

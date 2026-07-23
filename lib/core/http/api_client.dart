@@ -31,6 +31,17 @@ class ApiClient {
   String? _cachedToken;
   String? get currentToken => _cachedToken;
 
+  /// Token de acceso, leyendolo del storage si aun no esta en memoria.
+  /// En frio [currentToken] es null hasta la primera peticion autenticada;
+  /// esto permite a consumidores directos (p. ej. carga de imagenes con auth)
+  /// autenticarse sin depender de esa carrera.
+  Future<String?> ensureToken() async {
+    if (_cachedToken != null) return _cachedToken;
+    final token = await _authStorage.readToken();
+    if (token != null) _cachedToken = token;
+    return token;
+  }
+
   Future<bool> refreshSession() => _tryRefreshToken();
 
   Future<Map<String, dynamic>> get(String path, {bool auth = true}) {

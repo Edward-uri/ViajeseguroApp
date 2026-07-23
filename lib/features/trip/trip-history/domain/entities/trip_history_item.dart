@@ -1,3 +1,5 @@
+import '../../../trip-in-progress/domain/entities/tipo_servicio.dart';
+
 enum TripHistoryStatus { completado, cancelado, solicitado, aceptado, enCurso }
 
 class TripHistoryItem {
@@ -40,10 +42,7 @@ class TripHistoryItem {
   bool get isCancelado => estado == TripHistoryStatus.cancelado;
   bool get isEnCurso => estado == TripHistoryStatus.enCurso;
 
-  String get tipoLabel {
-    if (tipo == 'envio') return 'Envio de paquete';
-    return 'Mototaxi';
-  }
+  String get tipoLabel => TipoServicio.label(tipo);
 
   factory TripHistoryItem.fromJson(Map<String, dynamic> json) {
     final origen = json['origen'] as Map<String, dynamic>? ?? {};

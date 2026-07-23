@@ -9,4 +9,7 @@ class AppRoutes {
   static const String tripSearching = '/trip/searching';
   static const String tripInProgress = '/trip/in-progress';
   static const String tripEvaluation = '/trip/evaluation';
+  static const String helpCenter = '/help';
+  static const String favorites = '/favorites';
+  static const String createFavorite = '/favorites/create';
 }

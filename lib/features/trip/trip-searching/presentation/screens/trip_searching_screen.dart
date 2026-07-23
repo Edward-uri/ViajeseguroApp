@@ -11,12 +11,17 @@ import '../../../../../shared/utils/svg_to_mapbox.dart';
 import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/jala_theme.dart';
 import '../../../trip-in-progress/domain/entities/estimacion_viaje.dart';
+import '../../../trip-in-progress/domain/entities/tipo_servicio.dart';
 import '../../di/trip_searching_module.dart';
 import '../../domain/entities/trip_location.dart';
 import '../provider/trip_searching_viewmodel.dart';
 
 class TripSearchingScreen extends ConsumerStatefulWidget {
-  const TripSearchingScreen({super.key});
+  const TripSearchingScreen({super.key, this.presetDestination});
+
+  /// Si viene, se abre con origen = ubicacion actual y este destino precargado
+  /// (tap en un destino guardado desde la home).
+  final TripLocation? presetDestination;
 
   @override
   ConsumerState<TripSearchingScreen> createState() => _TripSearchingScreenState();
@@ -37,9 +42,18 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(tripSearchingViewModelProvider.notifier).resetAll();
-      _getCurrentLocation();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notifier = ref.read(tripSearchingViewModelProvider.notifier);
+      notifier.resetAll();
+      await _getCurrentLocation();
+      final preset = widget.presetDestination;
+      if (preset != null && _currentPosition != null && mounted) {
+        await notifier.presetTrip(
+          originLat: _currentPosition!.latitude,
+          originLng: _currentPosition!.longitude,
+          destination: preset,
+        );
+      }
     });
   }
 
@@ -71,6 +85,10 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
 
       if (mounted) {
         setState(() => _currentPosition = position);
+        // Sesgar la busqueda de direcciones hacia la ubicacion del pasajero.
+        ref
+            .read(tripSearchingViewModelProvider.notifier)
+            .setSearchProximity(position.latitude, position.longitude);
         _flyTo(position.latitude, position.longitude);
       }
     } catch (e) {
@@ -373,20 +391,17 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
                   bottomPadding: bottomPadding,
                   onConfirmTrip: () => _confirmTrip(context, notifier),
                   onRequestFare: () => _requestFare(notifier),
-                  onUseCurrentLocation: () {
+                  onUseCurrentLocation: () async {
                     if (_currentPosition == null) return;
-                    final location = TripLocation(
-                      address: 'Mi ubicacion actual',
-                      latitude: _currentPosition!.latitude,
-                      longitude: _currentPosition!.longitude,
-                      placeName: 'Mi ubicacion',
+                    final wasOrigin =
+                        vm.activeInput == LocationInputMode.origin;
+                    // Resolver la direccion real por reverse geocoding en vez
+                    // de guardar el texto fijo "Mi ubicacion".
+                    await notifier.useCurrentLocation(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
                     );
-                    if (vm.activeInput == LocationInputMode.origin) {
-                      notifier.selectOrigin(location);
-                      _destinationFocusNode.requestFocus();
-                    } else {
-                      notifier.selectDestination(location);
-                    }
+                    if (wasOrigin) _destinationFocusNode.requestFocus();
                   },
                 );
               },
@@ -398,10 +413,15 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
   }
 
   double _bottomPanelHeight(TripSearchingViewModelState vm) {
+    // Al elegir en el mapa el panel se colapsa (solo el panel de confirmar),
+    // asi el pin del marcador queda visible arriba.
+    if (vm.isPickingOnMap) return 180;
     double base = 340;
+    // Selector viaje/paquete (46px + 18px de separacion); solo visible mientras
+    // no se muestra la tarifa.
+    if (vm.step != TripSearchingStep.fareShown) base += 64;
     if (vm.searchResults.isNotEmpty || vm.isSearching) base += 200;
     if (vm.hasRoute) base += 80;
-    if (vm.isPickingOnMap) base += 20;
     return base;
   }
 
@@ -468,38 +488,56 @@ class _BottomPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: context.brand.greyBorder,
-                borderRadius: BorderRadius.circular(2.5),
-              ),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 22),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'A donde vas?',
-                    style: context.text.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: context.colors.onSurface,
+                  // Al elegir en el mapa se ocultan selector/titulo/inputs para
+                  // que el pin del marcador quede visible (antes lo tapaban).
+                  if (!vm.isPickingOnMap) ...[
+                    if (vm.step != TripSearchingStep.fareShown) ...[
+                      _ServiceTypeSelector(
+                        selected: vm.tipoServicio,
+                        onChanged: notifier.setTipoServicio,
+                      ),
+                      const SizedBox(height: 18),
+                    ],
+                    Text(
+                      vm.step == TripSearchingStep.fareShown
+                          ? (vm.tipoServicio == TipoServicio.envio
+                              ? 'Confirma tu envio'
+                              : 'Confirma tu viaje')
+                          : (vm.tipoServicio == TipoServicio.envio
+                              ? 'A donde lo envias?'
+                              : 'A donde vas?'),
+                      style: context.text.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: context.colors.onSurface,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  _LocationInputs(
-                    vm: vm,
-                    notifier: notifier,
-                    originController: originController,
-                    destinationController: destinationController,
-                    originFocusNode: originFocusNode,
-                    destinationFocusNode: destinationFocusNode,
-                  ),
-                  const _SectionSpacer(isVisible: true),
+                    const SizedBox(height: 14),
+                    // Al confirmar (tarifa) se muestra un resumen limpio de la
+                    // ruta en vez de los campos editables (mas claro y minimal).
+                    if (vm.step == TripSearchingStep.fareShown &&
+                        vm.origin != null &&
+                        vm.destination != null)
+                      _RouteSummary(
+                        origin: vm.origin!,
+                        destination: vm.destination!,
+                      )
+                    else
+                      _LocationInputs(
+                        vm: vm,
+                        notifier: notifier,
+                        originController: originController,
+                        destinationController: destinationController,
+                        originFocusNode: originFocusNode,
+                        destinationFocusNode: destinationFocusNode,
+                      ),
+                    const _SectionSpacer(isVisible: true),
+                  ],
                   _AnimatedSection(
                     visible: vm.isPickingOnMap,
                     sectionKey: 'pickOnMap',
@@ -537,11 +575,14 @@ class _BottomPanel extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _PassengerSelector(
-                          count: vm.numPersonas,
-                          onChanged: notifier.setNumPersonas,
-                        ),
-                        const SizedBox(height: 12),
+                        // Un paquete no lleva pasajeros.
+                        if (vm.tipoServicio != TipoServicio.envio) ...[
+                          _PassengerSelector(
+                            count: vm.numPersonas,
+                            onChanged: notifier.setNumPersonas,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton(
@@ -555,7 +596,9 @@ class _BottomPanel extends StatelessWidget {
                                     width: 18,
                                     child: CircularProgressIndicator(strokeWidth: 2),
                                   )
-                                : const Text('Estimar viaje'),
+                                : Text(vm.tipoServicio == TipoServicio.envio
+                                    ? 'Estimar envio'
+                                    : 'Estimar viaje'),
                           ),
                         ),
                       ],
@@ -568,7 +611,10 @@ class _BottomPanel extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _EstimationCard(estimacion: vm.estimacion!),
+                          _EstimationCard(
+                            estimacion: vm.estimacion!,
+                            isPackage: vm.tipoServicio == TipoServicio.envio,
+                          ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
@@ -620,6 +666,103 @@ class _BottomPanel extends StatelessWidget {
   }
 }
 
+class _ServiceTypeSelector extends StatelessWidget {
+  const _ServiceTypeSelector({required this.selected, required this.onChanged});
+
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: context.brand.divider,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _ServiceTypeOption(
+            icon: Icons.electric_rickshaw_rounded,
+            label: 'Viaje',
+            isActive: selected != TipoServicio.envio,
+            onTap: () => onChanged(TipoServicio.viaje),
+          ),
+          _ServiceTypeOption(
+            icon: Icons.inventory_2_rounded,
+            label: 'Paquete',
+            isActive: selected == TipoServicio.envio,
+            onTap: () => onChanged(TipoServicio.envio),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceTypeOption extends StatelessWidget {
+  const _ServiceTypeOption({
+    required this.icon,
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: BoxDecoration(
+            color: isActive
+                ? context.colors.surfaceContainerLow
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: context.colors.onSurface.withValues(alpha: 0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isActive ? JalaBrand.amber : context.brand.greyDark,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: context.text.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isActive
+                      ? context.colors.onSurface
+                      : context.brand.greyDark,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LocationInputs extends StatelessWidget {
   const _LocationInputs({
     required this.vm,
@@ -664,8 +807,12 @@ class _LocationInputs extends StatelessWidget {
           }
         },
         onClear: () {
+          // Al quitar el origen se reinicia el destino tambien; mover el foco al
+          // origen (el destino queda deshabilitado) evita que la UI se trabe.
           originController.clear();
+          destinationController.clear();
           notifier.clearOrigin();
+          originFocusNode.requestFocus();
         },
       ),
       const SizedBox(height: 12),
@@ -1340,9 +1487,10 @@ class _PassengerButton extends StatelessWidget {
 }
 
 class _EstimationCard extends StatelessWidget {
-  const _EstimationCard({required this.estimacion});
+  const _EstimationCard({required this.estimacion, required this.isPackage});
 
   final EstimacionViaje estimacion;
+  final bool isPackage;
 
   @override
   Widget build(BuildContext context) {
@@ -1357,22 +1505,21 @@ class _EstimationCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Tarifa destacada
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
                 '\$${estimacion.tarifa.toStringAsFixed(0)}',
-                style: context.text.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                style: context.text.headlineLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
                   color: context.colors.onSurface,
                 ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 5),
               Text(
                 'MXN',
-                style: context.text.bodySmall?.copyWith(
+                style: context.text.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: context.brand.greyDark,
                 ),
@@ -1380,56 +1527,140 @@ class _EstimationCard extends StatelessWidget {
               const Spacer(),
               if (estimacion.tarifaEstimada)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: context.colors.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     'Estimada',
                     style: context.text.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
                       color: context.brand.greyDark,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          Divider(color: context.colors.outlineVariant, height: 1),
-          const SizedBox(height: 10),
-          // Detalles: distancia/tiempo y personas/precio-unitario
-          Row(
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 18,
+            runSpacing: 8,
             children: [
-              Icon(Icons.route_rounded, size: 16, color: context.brand.greyDark),
-              const SizedBox(width: 6),
-              if (estimacion.distanciaKm > 0)
-                Text(
-                  '${estimacion.distanciaKm.toStringAsFixed(1)} km · ${estimacion.duracionMin.toStringAsFixed(0)} min',
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.brand.greyDark,
-                  ),
-                )
-              else
-                Text(
-                  'Zona fija',
-                  style: context.text.bodySmall?.copyWith(
-                    color: context.brand.greyDark,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(Icons.group_rounded, size: 16, color: context.brand.greyDark),
-              const SizedBox(width: 6),
-              Text(
-                '${estimacion.personas} ${estimacion.personas == 1 ? "persona" : "personas"} · \$${estimacion.tarifaPorPersona.toStringAsFixed(0)} c/u',
-                style: context.text.bodySmall?.copyWith(
-                  color: context.brand.greyDark,
-                ),
+              _EstimationDetail(
+                icon: Icons.route_rounded,
+                label: estimacion.distanciaKm > 0
+                    ? '${estimacion.distanciaKm.toStringAsFixed(1)} km · ${estimacion.duracionMin.toStringAsFixed(0)} min'
+                    : 'Zona fija',
+              ),
+              _EstimationDetail(
+                icon: isPackage
+                    ? Icons.inventory_2_outlined
+                    : Icons.group_rounded,
+                label: isPackage
+                    ? 'Envio de paquete'
+                    : '${estimacion.personas} ${estimacion.personas == 1 ? "persona" : "personas"}',
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EstimationDetail extends StatelessWidget {
+  const _EstimationDetail({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: context.brand.greyDark),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style:
+              context.text.bodySmall?.copyWith(color: context.brand.greyDark),
+        ),
+      ],
+    );
+  }
+}
+
+/// Resumen limpio origen -> destino (linea con puntos) para la vista de
+/// confirmar, en vez de los campos editables.
+class _RouteSummary extends StatelessWidget {
+  const _RouteSummary({required this.origin, required this.destination});
+
+  final TripLocation origin;
+  final TripLocation destination;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: context.brand.surfaceLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.brand.greyBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 11,
+                  height: 11,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: context.brand.success,
+                  ),
+                ),
+                Container(
+                  width: 2,
+                  height: 22,
+                  color: context.brand.greyBorder,
+                ),
+                Icon(Icons.location_on, size: 15, color: JalaBrand.amber),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  origin.address,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: context.colors.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  destination.address,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: context.colors.onSurface,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
