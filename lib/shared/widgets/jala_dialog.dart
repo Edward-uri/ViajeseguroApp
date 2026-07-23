@@ -150,12 +150,20 @@ class JalaDialog extends StatelessWidget {
                       onPressed: onCancel,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: scheme.onSurface,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        minimumSize: const Size.fromHeight(48),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      child: Text(cancelText),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          cancelText,
+                          maxLines: 1,
+                          style: text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -167,12 +175,20 @@ class JalaDialog extends StatelessWidget {
                     style: FilledButton.styleFrom(
                       backgroundColor: accent,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      minimumSize: const Size.fromHeight(48),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(confirmText),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        confirmText,
+                        maxLines: 1,
+                        style: text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                    ),
                   ),
                 ),
               ],

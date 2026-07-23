@@ -88,7 +88,9 @@ class _ReportarConductorSheetState
         left: 20,
         right: 20,
         top: 4,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom +
+            MediaQuery.of(context).padding.bottom +
+            24,
       ),
       child: _listo ? _exito(context) : _formulario(context),
     );
