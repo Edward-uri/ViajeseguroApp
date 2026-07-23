@@ -146,6 +146,30 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
     }
   }
 
+  /// Precarga un viaje: origen = ubicacion actual (reverse-geocoded) y destino
+  /// = un favorito ya elegido. Deja el flujo listo para estimar.
+  Future<void> presetTrip({
+    required double originLat,
+    required double originLng,
+    required TripLocation destination,
+  }) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final origin =
+          await _tripSearchRepository.reverseGeocode(originLat, originLng);
+      state = state.copyWith(
+        origin: origin.copyWith(latitude: originLat, longitude: originLng),
+        destination: destination,
+        step: TripSearchingStep.readyToConfirm,
+        activeInput: LocationInputMode.destination,
+        isPickingOnMap: false,
+        isLoading: false,
+      );
+    } catch (_) {
+      state = state.copyWith(isLoading: false);
+    }
+  }
+
   void searchAddress(String query) {
     _debounceTimer?.cancel();
     if (query.trim().isEmpty) {
@@ -211,13 +235,14 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
   /// Vacía el origen para volver a elegirlo (marcador, búsqueda o ubicación
   /// actual). Reaparece el botón de "usar ubicación actual" (origin == null).
   void clearOrigin() {
-    state = state.copyWith(
-      origin: null,
+    // Reinicio total desde el origen: quitar el origen tambien invalida el
+    // destino y la estimacion (una ruta a medias con origen vacio dejaba la UI
+    // trabada). Se conservan tipo de servicio y numero de pasajeros.
+    state = TripSearchingViewModelState(
       step: TripSearchingStep.selectingOrigin,
       activeInput: LocationInputMode.origin,
-      searchQuery: '',
-      searchResults: [],
-      isPickingOnMap: false,
+      tipoServicio: state.tipoServicio,
+      numPersonas: state.numPersonas,
     );
   }
 
@@ -254,7 +279,11 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
 
   void setTipoServicio(String tipo) {
     if (state.tipoServicio == tipo) return;
-    state = state.copyWith(tipoServicio: tipo);
+    // Un paquete no lleva pasajeros: se cobra como 1 (precio de zona).
+    state = state.copyWith(
+      tipoServicio: tipo,
+      numPersonas: tipo == TipoServicio.envio ? 1 : state.numPersonas,
+    );
   }
 
   Future<void> requestFare() async {

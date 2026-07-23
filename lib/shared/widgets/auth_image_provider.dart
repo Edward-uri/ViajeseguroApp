@@ -10,10 +10,15 @@ class AuthImageProvider extends ImageProvider<AuthImageProvider> {
   AuthImageProvider({
     required this.userId,
     required this.apiClient,
+    this.version = 0,
   });
 
   final int userId;
   final ApiClient apiClient;
+
+  /// Cambia al subir una foto nueva para invalidar el cache (la key por
+  /// defecto es solo userId, que nunca cambia).
+  final int version;
 
   @override
   Future<AuthImageProvider> obtainKey(ImageConfiguration configuration) async {
@@ -80,8 +85,9 @@ class AuthImageProvider extends ImageProvider<AuthImageProvider> {
       identical(this, other) ||
       other is AuthImageProvider &&
           runtimeType == other.runtimeType &&
-          userId == other.userId;
+          userId == other.userId &&
+          version == other.version;
 
   @override
-  int get hashCode => userId.hashCode;
+  int get hashCode => Object.hash(userId, version);
 }

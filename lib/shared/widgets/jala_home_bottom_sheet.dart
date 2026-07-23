@@ -9,14 +9,14 @@ class JalaHomeBottomSheet extends StatelessWidget {
     super.key,
     required this.greetingName,
     this.onSearchTap,
-    this.onSavedAddressTap,
+    this.savedAddresses = const [],
     this.activeTrip,
     this.onActiveTripTap,
   });
 
   final String greetingName;
   final VoidCallback? onSearchTap;
-  final void Function(String title)? onSavedAddressTap;
+  final List<JalaSavedAddress> savedAddresses;
   final Trip? activeTrip;
   final VoidCallback? onActiveTripTap;
 
@@ -89,26 +89,13 @@ class JalaHomeBottomSheet extends StatelessWidget {
                     delay: const Duration(milliseconds: 300),
                     child: _SearchBar(onTap: onSearchTap),
                   ),
-                  const SizedBox(height: 20),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 400),
-                    child: _SavedAddress(
-                      icon: Icons.home_outlined,
-                      title: 'Casa',
-                      subtitle: 'Av. Hidalgo 123',
-                      onTap: () => onSavedAddressTap?.call('Casa'),
+                  if (savedAddresses.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    FadeSlideIn(
+                      delay: const Duration(milliseconds: 400),
+                      child: _SavedAddressList(items: savedAddresses),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 480),
-                    child: _SavedAddress(
-                      icon: Icons.work_outline,
-                      title: 'Trabajo',
-                      subtitle: 'Primaria 5 de mayo',
-                      onTap: () => onSavedAddressTap?.call('Trabajo'),
-                    ),
-                  ),
+                  ],
                 ],
                 const SizedBox(height: 24),
               ],
@@ -273,6 +260,51 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
+/// Destino guardado que se muestra en la home (mapeado desde una direccion
+/// favorita en la pantalla del pasajero).
+class JalaSavedAddress {
+  const JalaSavedAddress({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+}
+
+class _SavedAddressList extends StatelessWidget {
+  const _SavedAddressList({required this.items});
+
+  final List<JalaSavedAddress> items;
+
+  @override
+  Widget build(BuildContext context) {
+    // Altura acotada + scroll: el sheet no crece de mas y el ultimo destino se
+    // ve completo al hacer scroll.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 190),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        physics: const ClampingScrollPhysics(),
+        itemCount: items.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 14),
+        itemBuilder: (context, index) {
+          final a = items[index];
+          return _SavedAddress(
+            icon: Icons.place_outlined,
+            title: a.title,
+            subtitle: a.subtitle,
+            onTap: a.onTap,
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _SavedAddress extends StatelessWidget {
   const _SavedAddress({
     required this.icon,
@@ -312,6 +344,8 @@ class _SavedAddress extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontFamily: 'Plus Jakarta Sans',
                     fontSize: 16,
@@ -319,16 +353,20 @@ class _SavedAddress extends StatelessWidget {
                     color: context.colors.onSurface,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                    color: context.brand.greyDark,
+                if (subtitle.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      color: context.brand.greyDark,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

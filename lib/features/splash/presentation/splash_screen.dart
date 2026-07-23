@@ -5,7 +5,10 @@ import '../../../../core/auth/current_user_provider.dart';
 import '../../../../core/widgets/bubble_loader.dart';
 import '../../../../theme/jala_theme.dart';
 import '../../../routes/app_routes.dart';
+import '../../../shared/domain/entities/user.dart';
 import '../../auth/di/auth_module.dart';
+import '../../profile/di/profile_module.dart';
+import '../../profile/domain/repositories/profile_repository.dart';
 
 /// Splash de marca: siempre crema (igual que el launch screen nativo), así el
 /// arranque es un solo flujo de color sin flashazos, en claro y oscuro.
@@ -59,21 +62,41 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
   Future<void> _decideRoute() async {
     final authRepo = ref.read(authRepositoryProvider);
-    // Verificar sesión + delay mínimo en paralelo.
-    // El delay deja terminar la animación del logo antes de navegar.
+    final hasSession = await authRepo.hasSession();
+    if (!hasSession) {
+      await Future<void>.delayed(_minSplash);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+      return;
+    }
+    // Con sesión: user en caché, /me enriquecido y el delay mínimo en paralelo.
+    // El delay deja terminar la animación del logo; el /me (que trae el nombre,
+    // ausente en el user de sesión) suele resolver dentro de ese tiempo, así el
+    // home abre ya con el nombre y no con "Pasajero".
     final results = await Future.wait<dynamic>([
-      authRepo.hasSession(),
       authRepo.getCurrentUser(),
+      _fetchFreshUser(ref.read(profileRepositoryProvider)),
       Future<void>.delayed(_minSplash),
     ]);
-    final hasSession = results[0] as bool;
-    final user = results[1];
+    final cachedUser = results[0] as User?;
+    final freshUser = results[1] as User?;
     if (!mounted) return;
-    if (hasSession && user != null) {
+    final user = freshUser ?? cachedUser;
+    if (user != null) {
       ref.read(currentUserProvider.notifier).setUser(user);
       Navigator.of(context).pushReplacementNamed(AppRoutes.passengerHome);
     } else {
       Navigator.of(context).pushReplacementNamed(AppRoutes.login);
+    }
+  }
+
+  /// /me para enriquecer el nombre; null si falla (sin conexión) para caer al
+  /// usuario en caché sin romper el arranque.
+  Future<User?> _fetchFreshUser(ProfileRepository repo) async {
+    try {
+      return await repo.getMe();
+    } catch (_) {
+      return null;
     }
   }
 
