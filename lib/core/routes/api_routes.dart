@@ -30,6 +30,7 @@ abstract class ApiRoutes {
   static const String usersMePhotoPresign = '$usersBase/me/photo/presign';
   static const String usersMePhotoConfirm = '$usersBase/me/photo/confirm';
   static String usersPhoto(int id) => '$usersBase/$id/photo';
+  static const String usersDirecciones = '$usersBase/direcciones';
 
   static const String tripsBase = viajesBase;
   static const String trips = viajes;

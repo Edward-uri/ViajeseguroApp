@@ -6,11 +6,14 @@ import 'core/navigation/app_navigator.dart';
 import 'core/widgets/page_transitions.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
 import 'features/auth/presentation/screens/register_screen.dart';
+import 'features/favorites/presentation/screens/create_favorite_screen.dart';
+import 'features/favorites/presentation/screens/favorite_addresses_screen.dart';
 import 'features/help/presentation/screens/help_center_screen.dart';
 import 'features/passenger/home/presentation/screens/passenger_home_screen.dart';
 import 'features/profile/presentation/screens/profile_screen.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'features/trip/trip-in-progress/domain/entities/trip.dart';
+import 'features/trip/trip-searching/domain/entities/trip_location.dart';
 import 'features/trip/trip-in-progress/presentation/screens/trip_evaluation_screen.dart';
 import 'features/trip/trip-in-progress/presentation/screens/trip_in_progress_screen.dart';
 import 'features/trip/trip-searching/presentation/screens/trip_searching_screen.dart';
@@ -50,7 +53,10 @@ class JalaApp extends ConsumerWidget {
           case AppRoutes.passengerHome:
             return PageTransitions.fadeThrough(const PassengerHomeScreen());
           case AppRoutes.tripSearching:
-            return PageTransitions.slideUp(const TripSearchingScreen());
+            final preset = settings.arguments as TripLocation?;
+            return PageTransitions.slideUp(
+              TripSearchingScreen(presetDestination: preset),
+            );
           case AppRoutes.tripInProgress:
             final trip = settings.arguments as Trip;
             return PageTransitions.slideUp(TripInProgressScreen(trip: trip));
@@ -59,6 +65,10 @@ class JalaApp extends ConsumerWidget {
             return PageTransitions.slideUp(TripEvaluationScreen(trip: trip));
           case AppRoutes.helpCenter:
             return PageTransitions.scaleFade(const HelpCenterScreen());
+          case AppRoutes.favorites:
+            return PageTransitions.scaleFade(const FavoriteAddressesScreen());
+          case AppRoutes.createFavorite:
+            return PageTransitions.slideUp(const CreateFavoriteScreen());
           default:
             return PageTransitions.fadeThrough(const LoginScreen());
         }
