@@ -96,14 +96,13 @@ class _TripHistoryScreenState extends ConsumerState<TripHistoryScreen> {
                             padding:
                                 EdgeInsets.fromLTRB(24, 0, 24, 84 + bottomPad),
                             itemCount: items.length,
+                            // Sin FadeSlideIn por item: al reciclarse durante el
+                            // scroll re-disparaba la animacion (delay creciente)
+                            // y las tarjetas "desaparecian" hasta soltar.
                             itemBuilder: (context, index) {
-                              return FadeSlideIn(
-                                delay:
-                                    Duration(milliseconds: 350 + (index * 80)),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _TripHistoryCard(item: items[index]),
-                                ),
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _TripHistoryCard(item: items[index]),
                               );
                             },
                           ),
