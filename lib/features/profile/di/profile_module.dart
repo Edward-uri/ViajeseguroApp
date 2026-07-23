@@ -13,5 +13,8 @@ final profileApiProvider = Provider<ProfileApi>((ref) {
 });
 
 final profileRepositoryProvider = Provider<ProfileRepository>((ref) {
-  return ProfileRepositoryImpl(ref.watch(profileApiProvider));
+  return ProfileRepositoryImpl(
+    ref.watch(profileApiProvider),
+    ref.watch(authStorageProvider),
+  );
 });

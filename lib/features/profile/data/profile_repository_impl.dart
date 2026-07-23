@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import '../../../core/http/api_exception.dart';
+import '../../../core/storage/auth_storage.dart';
 import '../../../shared/data/mappers/user_mapper.dart';
 import '../../../shared/domain/entities/user.dart';
 import '../domain/entities/profile_photo_upload_ticket.dart';
@@ -8,14 +11,19 @@ import 'remote/profile_api.dart';
 
 
 class ProfileRepositoryImpl implements ProfileRepository {
-  ProfileRepositoryImpl(this._api);
+  ProfileRepositoryImpl(this._api, this._authStorage);
 
   final ProfileApi _api;
+  final AuthStorage _authStorage;
 
   @override
   Future<User> getMe() async {
     final response = await _api.getMe();
-    return UserMapper.fromJson(_unwrapData(response));
+    final user = UserMapper.fromJson(_unwrapData(response));
+    // Persistir el usuario enriquecido (trae `nombre`, ausente en el user de
+    // sesion) para que el proximo arranque muestre el nombre sin flash.
+    await _authStorage.writeUser(jsonEncode(UserMapper.toJson(user)));
+    return user;
   }
 
   @override

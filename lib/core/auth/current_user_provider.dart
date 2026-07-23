@@ -16,3 +16,8 @@ final currentUserProvider =
     StateNotifierProvider<CurrentUserNotifier, User?>((ref) {
   return CurrentUserNotifier();
 });
+
+/// Version de la foto de perfil. Se incrementa al subir una nueva para
+/// invalidar el cache de `AuthImageProvider` (cacheado por userId, que nunca
+/// cambia) y forzar la recarga en el menu y en la pantalla de perfil.
+final profilePhotoVersionProvider = StateProvider<int>((ref) => 0);
