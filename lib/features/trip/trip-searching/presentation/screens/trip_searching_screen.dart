@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
@@ -782,7 +781,14 @@ class _LocationInputs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Container(
+      decoration: BoxDecoration(
+        color: context.brand.surfaceLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.brand.greyBorder),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
       children: [
       _LocationField(
         label: 'Origen',
@@ -815,7 +821,10 @@ class _LocationInputs extends StatelessWidget {
           originFocusNode.requestFocus();
         },
       ),
-      const SizedBox(height: 12),
+      Padding(
+        padding: const EdgeInsets.only(left: 46),
+        child: Divider(height: 1, thickness: 1, color: context.brand.divider),
+      ),
       _LocationField(
         label: 'Destino',
         isOrigin: false,
@@ -844,6 +853,7 @@ class _LocationInputs extends StatelessWidget {
         },
       ),
     ],
+      ),
     );
   }
 }
@@ -940,21 +950,18 @@ class _LocationField extends StatelessWidget {
 
     return GestureDetector(
       onTap: enabled ? onTap : null,
-      child: Container(
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: brand.surfaceLight,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: brand.greyBorder,
-            width: 1,
-          ),
-        ),
+        color: isActive
+            ? JalaBrand.amber.withValues(alpha: 0.06)
+            : Colors.transparent,
         child: Row(
           children: [
-            _PinSvg(isOrigin: isOrigin),
-            const SizedBox(width: 12),
+            _LocationDot(isOrigin: isOrigin, enabled: enabled),
+            const SizedBox(width: 14),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -966,7 +973,7 @@ class _LocationField extends StatelessWidget {
                   color: colors.onSurface,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Buscar $label',
+                  hintText: label,
                   hintStyle: context.text.bodyLarge?.copyWith(
                     fontWeight: FontWeight.w400,
                     color: brand.greyLight,
@@ -980,59 +987,89 @@ class _LocationField extends StatelessWidget {
                 ),
               ),
             ),
-            // Botón de limpiar: aparece cuando el campo tiene texto (para
-            // vaciar y volver a elegir el punto). Oculto al elegir en el mapa.
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: controller,
-              builder: (_, value, _) {
-                if (value.text.isEmpty || !enabled || isPickingOnMap) {
-                  return const SizedBox.shrink();
-                }
-                return GestureDetector(
-                  onTap: onClear,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Icon(Icons.close_rounded,
-                        size: 18, color: colors.onSurfaceVariant),
-                  ),
-                );
-              },
-            ),
             const SizedBox(width: 8),
-            GestureDetector(
-              onTap: enabled ? onPinTap : null,
-              child: Icon(
-                isPickingOnMap ? Icons.close : Icons.place,
-                color: isPickingOnMap
-                    ? colors.error
-                    : enabled
-                        ? colors.onSurfaceVariant
-                        : brand.greyBorder,
-                size: 22,
-              ),
-            ),
+            _trailing(context),
           ],
         ),
       ),
     );
   }
+
+  Widget _trailing(BuildContext context) {
+    final colors = context.colors;
+    // Al elegir en el mapa: cerrar. Con texto: limpiar. Vacio: elegir en mapa.
+    if (isPickingOnMap) {
+      return _FieldIconButton(
+        icon: Icons.close_rounded,
+        color: colors.error,
+        onTap: enabled ? onPinTap : null,
+      );
+    }
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (_, value, _) {
+        if (value.text.isNotEmpty && enabled) {
+          return _FieldIconButton(
+            icon: Icons.close_rounded,
+            color: colors.onSurfaceVariant,
+            onTap: onClear,
+          );
+        }
+        return _FieldIconButton(
+          icon: Icons.map_outlined,
+          color: enabled ? colors.onSurfaceVariant : context.brand.greyBorder,
+          onTap: enabled ? onPinTap : null,
+        );
+      },
+    );
+  }
 }
 
-/// Pin SVG de origen (azul) o destino (naranja).
-class _PinSvg extends StatelessWidget {
-  const _PinSvg({required this.isOrigin, this.size = 20});
+/// Punto de origen (verde) o destino (naranja) para la card de ubicaciones.
+class _LocationDot extends StatelessWidget {
+  const _LocationDot({required this.isOrigin, required this.enabled});
 
   final bool isOrigin;
-  final double size;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return SvgPicture.asset(
-      isOrigin
-          ? 'lib/shared/icons/Pin-Azul.svg'
-          : 'lib/shared/icons/Pin-Naranja.svg',
-      width: size,
-      height: size * 1.2,
+    final color = !enabled
+        ? context.brand.greyBorder
+        : isOrigin
+            ? context.brand.success
+            : JalaBrand.amber;
+    return SizedBox(
+      width: 18,
+      child: Center(
+        child: isOrigin
+            ? Container(
+                width: 11,
+                height: 11,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+              )
+            : Icon(Icons.location_on, size: 18, color: color),
+      ),
+    );
+  }
+}
+
+class _FieldIconButton extends StatelessWidget {
+  const _FieldIconButton({required this.icon, required this.color, this.onTap});
+
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: Icon(icon, size: 20, color: color),
+      ),
     );
   }
 }
@@ -1143,7 +1180,7 @@ class _CurrentLocationButton extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: context.brand.surfaceLight,
+                color: context.brand.accentBlue.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(
