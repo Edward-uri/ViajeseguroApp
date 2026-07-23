@@ -28,7 +28,10 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
   final SocketService _socketService;
   final TripNotificationService _tripNotification;
 
+  static const String _noDriverReason = 'No se encontro un conductor';
+
   Timer? _pollingTimer;
+  Timer? _expiryTimer;
   StreamSubscription<DriverPosition>? _positionSubscription;
   StreamSubscription<TripSocketEvent>? _acceptedSub;
   StreamSubscription<TripSocketEvent>? _stateChangeSub;
@@ -48,6 +51,9 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
 
     // Polling como fallback (cada 10s, no 5s — el socket es primario)
     _startPolling(trip.id);
+
+    // Si expira sin conductor, se cancela solo con ese motivo.
+    _scheduleExpiry();
   }
 
   void _listenSocketEvents(String tripId) {
@@ -156,6 +162,28 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
     });
   }
 
+  /// Cancela el viaje automaticamente al expirar (no se encontro conductor).
+  void _scheduleExpiry() {
+    _expiryTimer?.cancel();
+    final trip = state.trip;
+    if (trip == null || trip.status != TripStatus.solicitado) return;
+    final expiraEn = trip.expiraEn;
+    if (expiraEn == null) return;
+    final remaining = expiraEn.difference(DateTime.now());
+    if (remaining.isNegative) {
+      _expireTrip();
+      return;
+    }
+    // +1s de margen para no adelantarse al backend.
+    _expiryTimer = Timer(remaining + const Duration(seconds: 1), _expireTrip);
+  }
+
+  void _expireTrip() {
+    // Solo si sigue buscando conductor (no lo aceptaron mientras tanto).
+    if (state.trip?.status != TripStatus.solicitado) return;
+    cancelTrip(motivo: _noDriverReason);
+  }
+
   void _startTracking(String tripId) {
     _positionSubscription?.cancel();
     _positionSubscription = _trackingService.startTracking(tripId).listen(
@@ -193,6 +221,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
       final trip = await _tripRepository.getTripById(tripId);
       state = state.copyWith(trip: trip, isLoading: false);
       _syncTripNotification();
+      _scheduleExpiry();
 
       if (trip.status == TripStatus.completado) {
         _cleanup();
@@ -207,6 +236,7 @@ class TripInProgressViewModel extends StateNotifier<TripInProgressViewModelState
 
   void _cleanup() {
     _pollingTimer?.cancel();
+    _expiryTimer?.cancel();
     _stopTracking();
     _acceptedSub?.cancel();
     _stateChangeSub?.cancel();
