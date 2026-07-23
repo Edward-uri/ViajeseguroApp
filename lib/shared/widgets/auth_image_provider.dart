@@ -33,17 +33,28 @@ class AuthImageProvider extends ImageProvider<AuthImageProvider> {
       // El 404 (usuario sin foto) es definitivo: cae al fallback sin reintentar.
       codec: () async {
         final url = '${apiClient.baseUrl}${ApiRoutes.usersPhoto(userId)}';
+        Future<http.StreamedResponse> fetch(String? token) {
+          final request = http.Request('GET', Uri.parse(url));
+          request.headers['Accept'] = 'image/*';
+          if (token != null) {
+            request.headers['Authorization'] = 'Bearer $token';
+          }
+          return http.Client().send(request);
+        }
+
         for (var intento = 0; ; intento++) {
           final ultimo = intento >= 2;
           int? status;
           try {
-            final token = apiClient.currentToken;
-            final request = http.Request('GET', Uri.parse(url));
-            request.headers['Accept'] = 'image/*';
-            if (token != null) {
-              request.headers['Authorization'] = 'Bearer $token';
+            // Leer el token del storage: en arranque en frio `currentToken` es
+            // null hasta la primera peticion autenticada; sin esto la foto salia
+            // sin Authorization y fallaba todo el viaje.
+            var response = await fetch(await apiClient.ensureToken());
+            // Token expirado: refrescar una vez y reintentar en el acto.
+            if (response.statusCode == 401 &&
+                await apiClient.refreshSession()) {
+              response = await fetch(apiClient.currentToken);
             }
-            final response = await http.Client().send(request);
             status = response.statusCode;
             if (status == 200) {
               final bytes = await response.stream.toBytes();

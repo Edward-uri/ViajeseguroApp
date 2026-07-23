@@ -1,3 +1,4 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -346,7 +347,7 @@ class _ProfileTabContent extends ConsumerWidget {
                     JalaSidebarOption(
                       icon: Icons.notifications_outlined,
                       label: 'Notificaciones',
-                      onTap: () => _openAppSettings(context),
+                      onTap: () => _openNotificationSettings(context),
                     ),
                     JalaSidebarOption(
                       icon: Icons.dark_mode_outlined,
@@ -362,7 +363,8 @@ class _ProfileTabContent extends ConsumerWidget {
                     JalaSidebarOption(
                       icon: Icons.help_outline_rounded,
                       label: 'Centro de ayuda',
-                      onTap: () {},
+                      onTap: () =>
+                          Navigator.of(context).pushNamed(AppRoutes.helpCenter),
                     ),
                     JalaSidebarOption(
                       icon: Icons.description_outlined,
@@ -443,17 +445,16 @@ class _ProfileTabContent extends ConsumerWidget {
     }
   }
 
-  Future<void> _openAppSettings(BuildContext context) async {
+  Future<void> _openNotificationSettings(BuildContext context) async {
     try {
-      // En Android, abrir la configuración de la app directamente
-      const packageName = 'com.jala.pasajero';
-      final uri = Uri.parse('package:$packageName');
-      await launchUrl(uri);
-    } catch (e) {
-      debugPrint('[PassengerHome] No se pudo abrir la configuración: $e');
+      await AppSettings.openAppSettings(type: AppSettingsType.notification);
+    } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo abrir la configuración')),
+          const SnackBar(
+            content:
+                Text('No se pudo abrir la configuracion de notificaciones'),
+          ),
         );
       }
     }

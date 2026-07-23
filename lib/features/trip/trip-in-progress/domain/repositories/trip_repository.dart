@@ -17,6 +17,7 @@ abstract class TripRepository {
     int personas = 1,
     int? idZonaDestino,
     double? tarifaEstimada,
+    String tipoServicio = 'viaje',
   });
 
   Future<Trip> getTripById(String tripId);
