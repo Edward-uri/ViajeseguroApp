@@ -11,6 +11,7 @@ import '../../../../../shared/utils/svg_to_mapbox.dart';
 import '../../../../../shared/widgets/widgets.dart';
 import '../../../../../theme/jala_theme.dart';
 import '../../../trip-in-progress/domain/entities/estimacion_viaje.dart';
+import '../../../trip-in-progress/domain/entities/tipo_servicio.dart';
 import '../../di/trip_searching_module.dart';
 import '../../domain/entities/trip_location.dart';
 import '../provider/trip_searching_viewmodel.dart';
@@ -373,20 +374,17 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
                   bottomPadding: bottomPadding,
                   onConfirmTrip: () => _confirmTrip(context, notifier),
                   onRequestFare: () => _requestFare(notifier),
-                  onUseCurrentLocation: () {
+                  onUseCurrentLocation: () async {
                     if (_currentPosition == null) return;
-                    final location = TripLocation(
-                      address: 'Mi ubicacion actual',
-                      latitude: _currentPosition!.latitude,
-                      longitude: _currentPosition!.longitude,
-                      placeName: 'Mi ubicacion',
+                    final wasOrigin =
+                        vm.activeInput == LocationInputMode.origin;
+                    // Resolver la direccion real por reverse geocoding en vez
+                    // de guardar el texto fijo "Mi ubicacion".
+                    await notifier.useCurrentLocation(
+                      _currentPosition!.latitude,
+                      _currentPosition!.longitude,
                     );
-                    if (vm.activeInput == LocationInputMode.origin) {
-                      notifier.selectOrigin(location);
-                      _destinationFocusNode.requestFocus();
-                    } else {
-                      notifier.selectDestination(location);
-                    }
+                    if (wasOrigin) _destinationFocusNode.requestFocus();
                   },
                 );
               },
@@ -399,6 +397,9 @@ class _TripSearchingScreenState extends ConsumerState<TripSearchingScreen> {
 
   double _bottomPanelHeight(TripSearchingViewModelState vm) {
     double base = 340;
+    // Selector viaje/paquete (46px + 18px de separacion); solo visible mientras
+    // no se muestra la tarifa.
+    if (vm.step != TripSearchingStep.fareShown) base += 64;
     if (vm.searchResults.isNotEmpty || vm.isSearching) base += 200;
     if (vm.hasRoute) base += 80;
     if (vm.isPickingOnMap) base += 20;
@@ -468,23 +469,23 @@ class _BottomPanel extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: context.brand.greyBorder,
-                borderRadius: BorderRadius.circular(2.5),
-              ),
-            ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 22),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (vm.step != TripSearchingStep.fareShown) ...[
+                    _ServiceTypeSelector(
+                      selected: vm.tipoServicio,
+                      onChanged: notifier.setTipoServicio,
+                    ),
+                    const SizedBox(height: 18),
+                  ],
                   Text(
-                    'A donde vas?',
+                    vm.tipoServicio == TipoServicio.envio
+                        ? 'A donde lo envias?'
+                        : 'A donde vas?',
                     style: context.text.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       color: context.colors.onSurface,
@@ -614,6 +615,103 @@ class _BottomPanel extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ServiceTypeSelector extends StatelessWidget {
+  const _ServiceTypeSelector({required this.selected, required this.onChanged});
+
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: context.brand.divider,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          _ServiceTypeOption(
+            icon: Icons.two_wheeler_rounded,
+            label: 'Viaje',
+            isActive: selected != TipoServicio.envio,
+            onTap: () => onChanged(TipoServicio.viaje),
+          ),
+          _ServiceTypeOption(
+            icon: Icons.inventory_2_rounded,
+            label: 'Paquete',
+            isActive: selected == TipoServicio.envio,
+            onTap: () => onChanged(TipoServicio.envio),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceTypeOption extends StatelessWidget {
+  const _ServiceTypeOption({
+    required this.icon,
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          decoration: BoxDecoration(
+            color: isActive
+                ? context.colors.surfaceContainerLow
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: context.colors.onSurface.withValues(alpha: 0.12),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isActive ? JalaBrand.amber : context.brand.greyDark,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: context.text.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isActive
+                      ? context.colors.onSurface
+                      : context.brand.greyDark,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

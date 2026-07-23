@@ -677,17 +677,7 @@ class _TripBottomPanelState extends State<_TripBottomPanel>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: context.brand.greyBorder,
-                  borderRadius: BorderRadius.circular(2.5),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 4),
             FadeSlideIn(
               delay: const Duration(milliseconds: 100),
               child: Text(
@@ -1182,17 +1172,7 @@ class _CancelReasonDialogState extends State<_CancelReasonDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: scheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 4),
           Row(
             children: [
               Container(

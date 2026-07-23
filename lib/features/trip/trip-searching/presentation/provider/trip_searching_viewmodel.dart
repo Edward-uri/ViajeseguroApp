@@ -8,6 +8,7 @@ import '../../../../../core/auth/current_user_provider.dart';
 import '../../../../../core/http/api_exception.dart';
 import '../../../trip-in-progress/di/trip_in_progress_module.dart';
 import '../../../trip-in-progress/domain/entities/estimacion_viaje.dart';
+import '../../../trip-in-progress/domain/entities/tipo_servicio.dart';
 import '../../../trip-in-progress/domain/entities/trip.dart';
 import '../../../trip-in-progress/domain/repositories/trip_repository.dart';
 import '../../di/trip_searching_module.dart';
@@ -120,6 +121,31 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
     }
   }
 
+  /// Usa la ubicacion actual del pasajero como origen/destino, resolviendo la
+  /// direccion real por reverse geocoding (antes se guardaba el texto fijo
+  /// "Mi ubicacion", que llegaba tal cual al backend como direccion del viaje).
+  Future<void> useCurrentLocation(double latitude, double longitude) async {
+    state = state.copyWith(isLoading: true, errorMessage: null);
+    try {
+      final location =
+          await _tripSearchRepository.reverseGeocode(latitude, longitude);
+      final resolved =
+          location.copyWith(latitude: latitude, longitude: longitude);
+      if (state.activeInput == LocationInputMode.origin) {
+        selectOrigin(resolved);
+      } else {
+        selectDestination(resolved);
+      }
+      state = state.copyWith(isLoading: false);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        errorMessage:
+            e is ApiException ? e.message : 'Error al obtener direccion',
+      );
+    }
+  }
+
   void searchAddress(String query) {
     _debounceTimer?.cancel();
     if (query.trim().isEmpty) {
@@ -171,6 +197,7 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
       step: TripSearchingStep.selectingDestination,
       activeInput: LocationInputMode.destination,
       origin: state.origin,
+      tipoServicio: state.tipoServicio,
       searchQuery: '',
       searchResults: [],
       isPickingOnMap: false,
@@ -197,6 +224,11 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
   void setNumPersonas(int n) {
     if (n < 1 || n > 3) return;
     state = state.copyWith(numPersonas: n, estimacion: null);
+  }
+
+  void setTipoServicio(String tipo) {
+    if (state.tipoServicio == tipo) return;
+    state = state.copyWith(tipoServicio: tipo);
   }
 
   Future<void> requestFare() async {
@@ -254,6 +286,7 @@ class TripSearchingViewModel extends StateNotifier<TripSearchingViewModelState> 
         personas: state.numPersonas,
         idZonaDestino: state.estimacion?.idZonaDestino,
         tarifaEstimada: state.estimacion?.tarifa,
+        tipoServicio: state.tipoServicio,
       );
       state = const TripSearchingViewModelState();
       return trip;
@@ -312,6 +345,7 @@ class TripSearchingViewModelState extends Equatable {
     this.trip,
     this.estimacion,
     this.numPersonas = 1,
+    this.tipoServicio = TipoServicio.viaje,
     this.searchQuery = '',
     this.searchResults = const [],
     this.isSearching = false,
@@ -331,6 +365,7 @@ class TripSearchingViewModelState extends Equatable {
   final Trip? trip;
   final EstimacionViaje? estimacion;
   final int numPersonas;
+  final String tipoServicio;
   final String searchQuery;
   final List<TripLocation> searchResults;
   final bool isSearching;
@@ -355,6 +390,7 @@ class TripSearchingViewModelState extends Equatable {
     Trip? trip,
     EstimacionViaje? estimacion,
     int? numPersonas,
+    String? tipoServicio,
     String? searchQuery,
     List<TripLocation>? searchResults,
     bool? isSearching,
@@ -374,6 +410,7 @@ class TripSearchingViewModelState extends Equatable {
       trip: trip ?? this.trip,
       estimacion: estimacion ?? this.estimacion,
       numPersonas: numPersonas ?? this.numPersonas,
+      tipoServicio: tipoServicio ?? this.tipoServicio,
       searchQuery: searchQuery ?? this.searchQuery,
       searchResults: searchResults ?? this.searchResults,
       isSearching: isSearching ?? this.isSearching,
@@ -396,6 +433,7 @@ class TripSearchingViewModelState extends Equatable {
         trip,
         estimacion,
         numPersonas,
+        tipoServicio,
         searchQuery,
         searchResults,
         isSearching,
